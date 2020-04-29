@@ -1,0 +1,11 @@
+/bin/
+/target/
+/recentPeers.txt
+/oldPeers.txt
+/database.db
+/currentPeers.txt
+/config.json
+/.eclipse-pmd
+/.classpath
+/.project
+/pom.xml
