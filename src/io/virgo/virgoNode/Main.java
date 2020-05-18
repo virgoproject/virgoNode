@@ -46,6 +46,10 @@ public class Main {
 	public static int txsSec = 0;
 	public static int rejectedTxCount = 0;
 	
+	/**
+	 * Main function
+	 * @param none
+	 */
 	public static void main(String[] none) {
 		
 		System.out.println(getAppName()+"\n"
