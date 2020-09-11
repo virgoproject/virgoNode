@@ -14,6 +14,11 @@ import io.virgo.virgoNode.DAG.Infos.AddressInfos;
 import io.virgo.geoWeb.MessageHandler;
 import io.virgo.geoWeb.Peer;
 
+/**
+ * Class handling peers messages, like new transactions or transaction requests
+ * TODO: Refactor into a function oriented event handler
+ *
+ */
 public class NetMessageHandler extends MessageHandler {
 
 	public HashSet<String> askedTxs = new HashSet<String>();
