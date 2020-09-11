@@ -471,10 +471,12 @@ public class LoadedTransaction extends Transaction {
 
 		long txweight = getWeight(true);
 		
-		System.out.println(getUid() + " " + txweight + " " + inputsStability);
+		float ownStab = (float) txweight/(getOutputsValue()-getReturnAmount());
 		
-		stability = (int) Math.min(((double)txweight/(getOutputsValue()-getReturnAmount()))*inputsStability,255);
+		stability = (int) (Math.min(ownStab,1)*inputsStability);
 		dagHeightOnLastStabUpdate = dag.loadedTxsCount();
+		
+		System.out.println(getUid() + " " + txweight + " " + inputsStability + " " + ownStab);
 		
 		return stability;
 	}

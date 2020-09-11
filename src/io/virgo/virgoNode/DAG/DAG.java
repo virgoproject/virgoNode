@@ -129,7 +129,7 @@ public class DAG {
 		ECDSASignature sig = ECDSASignature.fromByteArray(sigBytes);
 		
 		//check if signature is good
-		Sha256Hash TxHash = Sha256.getHash((parents.toString() + inputs.toString() + outputs.toString()).getBytes());
+		Sha256Hash TxHash = Sha256.getHash((parents.toString() + inputs.toString() + outputs.toString() + date).getBytes());
 		if(!signer.Verify(TxHash, sig, pubKey))
 			throw new IllegalArgumentException("Invalid signature");
 		
@@ -202,10 +202,6 @@ public class DAG {
 			long amount = input.getOutputsMap().get(tx.getAddress()).getAmount();
 			totalInputValue += amount;
 		}
-		
-		for(LoadedTransaction parent : loadedParents)
-			if(parent.getDate() > tx.getDate())
-				return;
 		
 		if(totalInputValue < tx.getOutputsValue())
 			throw new IllegalArgumentException("Trying to spend more than allowed ("+tx.getOutputsValue()+" / " + totalInputValue +")");
