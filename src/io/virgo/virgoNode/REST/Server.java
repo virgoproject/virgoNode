@@ -7,8 +7,12 @@ import java.util.Arrays;
 
 import com.sun.net.httpserver.HttpServer;
 
+import io.virgo.virgoNode.Main;
+
+//TODO: Complete API, make things configurable (require auth, enable or not API, choose serverPort..) 
 public class Server {
 
+	@SuppressWarnings("restriction")
 	public Server() throws IOException {
 		
 		int serverPort = 8000;
@@ -23,9 +27,11 @@ public class Server {
             	String requestedServlet = rawArgs[0];
             	String[] requestArguments = Arrays.copyOfRange(rawArgs, 1, rawArgs.length);
         		
-            	String response = "{}";
+            	Response response = new Response(405, "");// 405 Method Not Allowed
+            	
             	System.out.println(requestedServlet);
-        		switch(requestedServlet) {
+        		
+            	switch(requestedServlet) {
         			
         			case "addrtxs":
         				response = AddrTxsServlet.GET(requestArguments);
@@ -35,15 +41,15 @@ public class Server {
 	        			response = TxServlet.GET(requestArguments);
 	        			break;
 	        			
-	        		case "nodeInfos":
+	        		case "nodeinfos":
 	        			response = NodeInfosServlet.GET();
 	        			break;
         		
         		}
         		
-                exchange.sendResponseHeaders(200, response.getBytes().length);
+                exchange.sendResponseHeaders(response.getResponseCode(), response.getResponseBodyBytes().length);
                 OutputStream output = exchange.getResponseBody();
-                output.write(response.getBytes());
+                output.write(response.getResponseBodyBytes());
                 output.flush();
                 exchange.close();
         		

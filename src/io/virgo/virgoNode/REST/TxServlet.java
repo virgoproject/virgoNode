@@ -9,10 +9,10 @@ import io.virgo.virgoNode.DAG.TxOutput;
 
 public class TxServlet {
 
-	public static String GET(String[] arguments) {
+	public static Response GET(String[] arguments) {
 		
 		if(arguments.length == 0)
-			return "";
+			return new Response(405, "");
 		
 		System.out.println(arguments[0]);
 		
@@ -38,11 +38,16 @@ public class TxServlet {
 			}
 			
 			txState.put("outputsState", txOutputs);
-		}else {
-			txState.put("notLoaded", true);
+			
+			return new Response(200, txState.toString());
+			
+		} else {
+			txState.put("notFound", true);
+			
+			return new Response(404, txState.toString());
 		}
 		
-		return txState.toString();
+		
 	}
 	
 }

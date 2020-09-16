@@ -21,6 +21,8 @@ import io.virgo.virgoNode.REST.Server;
 import io.virgo.virgoNode.Utils.Miscellaneous;
 import io.virgo.geoWeb.exceptions.PortUnavailableException;
 
+
+//TODO: Refactor log system
 public class Main {
 	
 	public static final String VERSION = "0.0.5";
@@ -42,13 +44,14 @@ public class Main {
 	public static final byte[] ADDR_IDENTIFIER = new BigInteger("4039").toByteArray();
 	public static final byte[] TX_IDENTIFIER = new BigInteger("3823").toByteArray();
 	
+	//ugly debug stats
 	public static int confirmedTxCount = 0;
 	public static int txsSec = 0;
 	public static int rejectedTxCount = 0;
 	
 	/**
 	 * Main function
-	 * @param none
+	 * 
 	 */
 	public static void main(String[] none) {
 		
@@ -59,6 +62,7 @@ public class Main {
 		
 		System.out.println("Loaded config");
 		
+		//init database
 		try {
 			db = new Database(dbFileName);
 		}catch(SQLException e) {
@@ -66,6 +70,8 @@ public class Main {
 			System.out.println("Terminating.");
 		}
 
+		//init geoweb, peer to peer networking
+		//TODO: make Thread pool size configurable
 		try {
 			
 			GeoWeb.Builder builder = new GeoWeb.Builder();
@@ -88,6 +94,7 @@ public class Main {
 		System.out.println("P2P adapter loaded ! Listening on port " + netPort);
 		
 		System.out.println("Creating DAG");
+		
 		try {
 			dag = new DAG(tipsSaveInterval);
 		} catch (IOException e) {
@@ -104,6 +111,8 @@ public class Main {
 			e.printStackTrace();
 		}
 		
+		
+		//ugly debug stats
 		new Timer().scheduleAtFixedRate(new TimerTask() {
 
 			@Override

@@ -8,7 +8,7 @@ import io.virgo.virgoNode.DAG.Infos.AddressInfos;
 
 public class AddrTxsServlet {
 
-	public static String GET(String[] arguments) {
+	public static Response GET(String[] arguments) {
 		
 		JSONObject txs = new JSONObject();
 		txs.put("address", arguments[0]);
@@ -23,7 +23,7 @@ public class AddrTxsServlet {
 			txs.put("outputs", new JSONArray());
 		}
 		
-		return txs.toString();
+		return new Response(200,txs.toString());
 		
 	}
 	
