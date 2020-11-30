@@ -4,9 +4,12 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.NavigableMap;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -25,9 +28,11 @@ import io.virgo.virgoNode.DAG.Infos.DAGInfos;
 import io.virgo.virgoNode.Data.TxLoader;
 import io.virgo.virgoNode.Data.TxWriter;
 import io.virgo.virgoNode.Utils.Miscellaneous;
+import io.virgo.virgoNode.network.Peers;
 
 public class DAG {
 
+	private List<String> processingTransactions = Collections.synchronizedList(new ArrayList<String>());
 	private ConcurrentHashMap<String, LoadedTransaction> loadedTransactions = new ConcurrentHashMap<String, LoadedTransaction>();
 	protected List<LoadedTransaction> mainChain = Collections.synchronizedList(new ArrayList<LoadedTransaction>());
 	protected NavigableMap<Long, LoadedTransaction> nodesToCheck = Collections.synchronizedNavigableMap(new TreeMap<Long, LoadedTransaction>());
@@ -69,9 +74,26 @@ public class DAG {
 		
 		loadDAG();
 		
-		JSONObject getTipsMsg = new JSONObject();
-		getTipsMsg.put("command", "getTips");
-		Main.getGeoWeb().broadCast(getTipsMsg);
+		new Timer().scheduleAtFixedRate(new TimerTask() {
+
+			@Override
+			public void run() {
+				
+				Peers.getTips();
+				
+				try {
+					Thread.sleep(5000);
+				} catch (InterruptedException e) {}
+				
+				if(waitedTxs.size() != 0) {
+					Collection<String> lakingTransactions = waitedTxs.keySet();
+					lakingTransactions.removeAll(waitingTxsUids);
+					Peers.askTxs(lakingTransactions);
+				} else
+					System.out.println("no waited tx");
+			}
+			
+		}, 10000, 10000);
 		
 	}
 	
@@ -116,22 +138,35 @@ public class DAG {
 		if(loadedTransactions.containsKey(txUid) || waitingTxsUids.contains(txUid))
 			return;
 		
+		synchronized(processingTransactions) {
+			if(processingTransactions.contains(txUid))
+				return;
+			else
+				processingTransactions.add(txUid);
+		}
+		
 		JSONArray[] cleanedTx = cleanTx(parents, inputs, outputs);
 		parents = cleanedTx[0];
 		inputs = cleanedTx[1];
 		outputs = cleanedTx[2];
 		
 		//make sure neither inputs or ouputs are empty
-		if(inputs.isEmpty() || outputs.isEmpty() || parents.isEmpty())
+		if(inputs.isEmpty() || outputs.isEmpty() || parents.isEmpty()) {
+			processingTransactions.remove(txUid);
 			throw new IllegalArgumentException("Invalid transaction format");
+		}
+			
 		
 		ECDSA signer = new ECDSA();
 		ECDSASignature sig = ECDSASignature.fromByteArray(sigBytes);
 		
 		//check if signature is good
 		Sha256Hash TxHash = Sha256.getHash((parents.toString() + inputs.toString() + outputs.toString() + date).getBytes());
-		if(!signer.Verify(TxHash, sig, pubKey))
+		if(!signer.Verify(TxHash, sig, pubKey)) {
+			processingTransactions.remove(txUid);
 			throw new IllegalArgumentException("Invalid signature");
+		}
+			
 		
 		ArrayList<String> parentsUids = new ArrayList<String>();
 		for(int i = 0; i < parents.length(); i++)
@@ -186,25 +221,39 @@ public class DAG {
 		if(!waitedTxs.isEmpty()) {
 			addWaitedTxs(waitedTxs, new OrphanTransaction(tx, waitedTxs.toArray(new String[waitedTxs.size()])));
 			loader.push(waitedTxs);
+			processingTransactions.remove(tx.getUid());
 			return;
 		}
+		
+		//check if transaction has no useless parent
+		if(loadedParents.size() > 1 && (loadedParents.get(0).isChildOf(loadedParents.get(1)) || loadedParents.get(1).isChildOf(loadedParents.get(0))))
+			return;
+
 		
 		long totalInputValue = 0;
 		
 		//check if inputs are valid and calculate inputs total value
 		for(LoadedTransaction input : loadedInputs) {
-			if(!input.getOutputsMap().containsKey(tx.getAddress()))
+			if(!input.getOutputsMap().containsKey(tx.getAddress())) {
+				processingTransactions.remove(tx.getUid());
 				return;
+			}
 			
-			if(input.getDate() > tx.getDate())
+			if(input.getDate() > tx.getDate()) {
+				processingTransactions.remove(tx.getUid());
 				return;
+			}
+				
 			
 			long amount = input.getOutputsMap().get(tx.getAddress()).getAmount();
 			totalInputValue += amount;
 		}
 		
-		if(totalInputValue < tx.getOutputsValue())
+		if(totalInputValue < tx.getOutputsValue()) {
+			processingTransactions.remove(tx.getUid());
 			throw new IllegalArgumentException("Trying to spend more than allowed ("+tx.getOutputsValue()+" / " + totalInputValue +")");
+		}
+			
 		
 		LoadedTransaction loadedTx = new LoadedTransaction(this, tx, loadedParents.toArray(new LoadedTransaction[loadedParents.size()]), loadedInputs.toArray(new LoadedTransaction[loadedInputs.size()]));
 		
@@ -215,6 +264,8 @@ public class DAG {
 		
 		if(!loadedTx.isSaved())
 			loadedTx.save();
+		
+		processingTransactions.remove(tx.getUid());
 		
 		removeWaitedTx(loadedTx.getUid());		
 		
@@ -292,7 +343,7 @@ public class DAG {
 	}
 
 	public boolean hasTransaction(String uid) {
-		if(loadedTransactions.containsKey(uid))
+		if(loadedTransactions.containsKey(uid) || waitingTxsUids.contains(uid))
 			return true;
 		
 		try {

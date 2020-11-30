@@ -1,7 +1,6 @@
 package io.virgo.virgoNode.DAG;
 
 import java.math.BigInteger;
-import java.util.Collection;
 
 import io.virgo.virgoCryptoLib.Converter;
 import io.virgo.virgoNode.Main;

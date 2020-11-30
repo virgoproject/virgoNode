@@ -11,6 +11,7 @@ import org.json.JSONObject;
 
 import io.virgo.virgoNode.DAG.Events.TransactionLoadedEvent;
 import io.virgo.virgoNode.DAG.Events.TransactionStatusChangedEvent;
+import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.DAG.WeightModifier.Modifier;
 
 public class LoadedTransaction extends Transaction {
@@ -18,23 +19,24 @@ public class LoadedTransaction extends Transaction {
 	private DAG dag;
 	
 	//branchs the transaction is part of and the modifier (ex SUB1000000 or DIV2) applied to calculate weight
-	LinkedHashMap<Branch, WeightModifier> branchs = new LinkedHashMap<Branch, WeightModifier>();
+	protected LinkedHashMap<Branch, WeightModifier> branchs = new LinkedHashMap<Branch, WeightModifier>();
 	HashMap<Branch, Integer> partOf = new HashMap<Branch, Integer>();//part of branch till
 	
-	private ArrayList<String> childs = new ArrayList<String>();
+	public ArrayList<String> childs = new ArrayList<String>();
 	
-	private ArrayList<LoadedTransaction> loadedParents;
+	private ArrayList<LoadedTransaction> loadedParents = new ArrayList<LoadedTransaction>();
 	private ArrayList<LoadedTransaction> loadedChilds = new ArrayList<LoadedTransaction>();
 	
 	private long height = 0;
 	private long ceilingValue = 0;//smallest main chain vertex number the tx is parent of
 	
 	private ArrayList<TxOutput> loadedInputs = new ArrayList<TxOutput>();
-	private ArrayList<LoadedTransaction> loadedInputTxs;
+	private ArrayList<LoadedTransaction> loadedInputTxs = new ArrayList<LoadedTransaction>();
 	
 	public ArrayList<LoadedTransaction> loadedOutputClaimers = new ArrayList<LoadedTransaction>();
 
 	private volatile long weight = 0;
+	private long selfWeight = 0;
 	private volatile long dagHeightOnLastWeightUpdate = 0;
 	
 
@@ -57,8 +59,8 @@ public class LoadedTransaction extends Transaction {
 		
 		this.dag = dag;
 		
-		this.loadedParents = new ArrayList<LoadedTransaction>(Arrays.asList(parents));
-		this.loadedInputTxs = new ArrayList<LoadedTransaction>(Arrays.asList(inputTxs));
+		this.loadedParents.addAll(Arrays.asList(parents));
+		this.loadedInputTxs.addAll(Arrays.asList(inputTxs));
 		
 		for(LoadedTransaction inputTx : inputTxs) {
 			TxOutput out = inputTx.getOutputsMap().get(getAddress());
@@ -73,15 +75,14 @@ public class LoadedTransaction extends Transaction {
 		}
 		
 		if(loadedParents.size() == 1) {
-			parentsOrder = ParentsOrder.FIRST_YOUNGER;
-		} else {//else there's 2 parents, we need to check for order
-			if(loadedParents.get(0).isChildOf(loadedParents.get(1)))
-				parentsOrder = ParentsOrder.FIRST_YOUNGER;
-			else if(loadedParents.get(1).isChildOf(loadedParents.get(0)))
-				parentsOrder = ParentsOrder.SECOND_YOUNGER;
-		}
-		
-		height = loadedParents.get(parentsOrder.getCardinalOrder()-1).getHeight() + 1;
+			parentsOrder = ParentsOrder.ORDERED;
+			height = loadedParents.get(0).getHeight() + 1;
+		} else
+			for(LoadedTransaction parent : loadedParents)
+				if(parent.getHeight() > height)
+					height = parent.getHeight() + 1;
+			
+		selfWeight = getTotalInput() - getOutputsValue();
 		
 		setupBranch();
 		
@@ -101,6 +102,8 @@ public class LoadedTransaction extends Transaction {
 		dag.nodesToCheck.put(0l, this);
 		
 		stability = 255;
+		
+		selfWeight = Main.TOTALUNITS;
 		
 		Branch branch = new Branch();
 		branch.addTx(this);
@@ -125,26 +128,27 @@ public class LoadedTransaction extends Transaction {
 			return;
 		}
 		
-		LoadedTransaction youngestParent = loadedParents.get(getParentsOrder().ordinal());
+		LoadedTransaction parent = loadedParents.get(0);
 		
-		if(youngestParent.childs.size() == 1) {
-			Branch parentMainBranch = youngestParent.getMainBranch();
+		if(parent.childs.size() == 1) {//transaction is parent's first child, make part of parent's main branch
+			Branch parentMainBranch = parent.getMainBranch();
 			branchs.put(parentMainBranch, new WeightModifier(Modifier.SUB, parentMainBranch.addTx(this)));
 		} else {
 			
 			WeightModifier modifierForAll = new WeightModifier(Modifier.NONE, 0);
 			
-			//create branch ?
+			//create branch
 			Branch branch = new Branch();
 			branch.addTx(this);
 			branchs.put(branch, modifierForAll);
 			
-			for(LoadedTransaction parent : loadedParents)
-				for(LoadedTransaction parentChainMember : parent.getMainBranch().getMembersBefore(parent))
-					parentChainMember.branchs.put(branch, modifierForAll);
+			//add branch to parent transactions branchs
+			for(LoadedTransaction parentChainMember : parent.getMainBranch().getMembersBefore(parent))
+				parentChainMember.branchs.put(branch, modifierForAll);
+
 			
-			if(dag.mainChain.contains(youngestParent))
-				dag.nodesToCheck.put(youngestParent.ceilingValue, youngestParent);
+			if(dag.mainChain.contains(parent))
+				dag.nodesToCheck.put(parent.ceilingValue, parent);
 			
 		}
 		
@@ -153,6 +157,28 @@ public class LoadedTransaction extends Transaction {
 	}
 	
 	public boolean isChildOf(LoadedTransaction target) {
+		
+		for(Branch branch : partOf.keySet()) {
+			
+			if(target.partOf.containsKey(branch))
+				if(branch.positionOf(this) > branch.positionOf(target))
+					return true;
+			
+		}
+		
+		return false;
+		
+		/**boolean whatToreturn = false;
+		
+		if(loadedParents.contains(target))
+			whatToreturn = true;
+		
+		for(LoadedTransaction parent : loadedParents)
+			if(parent.isChildOf(target))
+				whatToreturn = true;
+		
+		return false;
+		
 		/**for(LoadedTransaction parent : loadedParents) {
 			if(parent == target)
 				return true;
@@ -166,14 +192,14 @@ public class LoadedTransaction extends Transaction {
 
 		}		
 		return false;**/
-		for(Branch branch : partOf.keySet()) {
+		/**for(Branch branch : partOf.keySet()) {
 			
 			if(target.partOf.containsKey(branch))
 				if(target.partOf.get(branch) <= partOf.get(branch))
 					return true;
 			
 		}
-		return false;
+		return false;**/
 	}
 	
 	public void addChild(LoadedTransaction child) {
@@ -522,7 +548,7 @@ public class LoadedTransaction extends Transaction {
 	}
 
 	public long getSelfWeight() {
-		return getTotalInput() - getOutputsValue();
+		return selfWeight;
 	}
 	
 	public Branch getMainBranch() {

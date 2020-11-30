@@ -7,12 +7,9 @@ import java.util.Arrays;
 
 import com.sun.net.httpserver.HttpServer;
 
-import io.virgo.virgoNode.Main;
-
 //TODO: Complete API, make things configurable (require auth, enable or not API, choose serverPort..) 
 public class Server {
 
-	@SuppressWarnings("restriction")
 	public Server() throws IOException {
 		
 		int serverPort = 8000;

@@ -2,8 +2,7 @@ package io.virgo.virgoNode.DAG;
 
 public enum ParentsOrder {
 
-	FIRST_YOUNGER(1),
-	SECOND_YOUNGER(2),
+	ORDERED(1),
 	NO_ORDER(0);
 	
 	private int order;
@@ -12,12 +11,8 @@ public enum ParentsOrder {
 		this.order = order;
 	}
 	
-	public boolean isFirstYounger() {
-		return this == FIRST_YOUNGER;
-	}
-	
-	public boolean isSecondYounger() {
-		return this == SECOND_YOUNGER;
+	public boolean isOrdered() {
+		return this == ORDERED;
 	}
 	
 	public boolean hasNoOrder() {

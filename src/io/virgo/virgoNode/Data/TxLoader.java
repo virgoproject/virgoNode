@@ -1,6 +1,7 @@
 package io.virgo.virgoNode.Data;
 
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -11,6 +12,7 @@ import org.json.JSONObject;
 import io.virgo.virgoCryptoLib.Converter;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.DAG.DAG;
+import io.virgo.virgoNode.network.Peers;
 
 public class TxLoader implements Runnable{
 
@@ -44,10 +46,7 @@ public class TxLoader implements Runnable{
 					} else throw new JSONException("");
 					
 				} catch (JSONException | SQLException e) {
-					JSONObject request = new JSONObject();
-					request.put("command", "asktx");
-					request.put("id", txUid);
-					Main.getGeoWeb().broadCast(request);
+					Peers.askTxs(Arrays.asList(txUid));
 				}				
 				
 			} catch (InterruptedException e) {

@@ -68,7 +68,6 @@ public class Database {
         ResultSet result = stmt.executeQuery(sql);
 		
         if(result.next()) {
-        	System.out.println("got " + txId);
         	JSONObject txJson = new JSONObject();
         	
     		txJson.put("sig", Converter.bytesToHex(result.getBytes("sig")));

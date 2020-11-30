@@ -13,12 +13,11 @@ import org.json.JSONObject;
 
 import io.virgo.geoWeb.GeoWeb;
 import io.virgo.geoWeb.utils.AddressUtils;
-import io.virgo.virgoCryptoLib.Converter;
-import io.virgo.virgoCryptoLib.ECDSA;
 import io.virgo.virgoNode.DAG.DAG;
 import io.virgo.virgoNode.Data.Database;
 import io.virgo.virgoNode.REST.Server;
 import io.virgo.virgoNode.Utils.Miscellaneous;
+import io.virgo.virgoNode.network.NetMessageHandler;
 import io.virgo.geoWeb.exceptions.PortUnavailableException;
 
 
@@ -105,7 +104,7 @@ public class Main {
 		
 		System.out.println("Running REST server on port 8000");
 		try {
-			Server server = new Server();
+			new Server();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -119,7 +118,10 @@ public class Main {
 			public void run() {
 				confirmedTxCount += txsSec;
 				System.out.println(txsSec + " txs/s, " + confirmedTxCount + " in total, " + dag.getPoolSize() + " txs waiting");
+				System.out.println(net.getPeers().size() + " peers");
 				txsSec = 0;
+					
+				
 			}
 			
 		}, 1000l, 1000l);

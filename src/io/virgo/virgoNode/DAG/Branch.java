@@ -8,9 +8,7 @@ public class Branch {
 	private ArrayList<LoadedTransaction> transactions = new ArrayList<LoadedTransaction>();
 	private long branchWeight = 0;
 
-	public Branch() {
-		
-	}
+	public Branch() {}
 	
 	public long addTx(LoadedTransaction tx) {
 		
@@ -57,6 +55,13 @@ public class Branch {
 			WeightModifier modifier = tx.branchs.get(this);
 			modifier.setValue(modifier.getValue()+transaction.getSelfWeight());
 		}
+	}
+
+	public int positionOf(LoadedTransaction transaction) {
+		int indexOf = transactions.indexOf(transaction);
+		if(indexOf != -1)
+			return indexOf;
+		return transactions.size()-1;
 	}
 	
 }
