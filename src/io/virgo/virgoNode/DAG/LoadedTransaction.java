@@ -49,9 +49,9 @@ public class LoadedTransaction extends Transaction {
 	
 	private ParentsOrder parentsOrder = ParentsOrder.NO_ORDER;
 	
-	private boolean parentsConfirmed = false;//parents = all transaction before self, not only direct parents
+	//private volatile boolean parentsConfirmed = false;//parents = all transaction before self, not only direct parents
 	
-	private TxStatus status = TxStatus.PENDING;
+	private volatile TxStatus status = TxStatus.PENDING;
 	
 	public LoadedTransaction(DAG dag, Transaction baseTransaction, LoadedTransaction[] parents, LoadedTransaction[] inputTxs) {
 		
@@ -69,9 +69,21 @@ public class LoadedTransaction extends Transaction {
 			inputsValue += out.getAmount();
 		}
 		
+		dag.childLessTxs.add(this);
+		
 		for(LoadedTransaction parent : loadedParents) {
 			parent.addChild(this);
-			partOf.putAll(parent.partOf);
+			
+			for(Branch branch : parent.partOf.keySet()) {
+				if(partOf.containsKey(branch)) {
+					if(parent.partOf.get(branch) > partOf.get(branch))
+						partOf.put(branch, parent.partOf.get(branch));
+				} else {
+					partOf.put(branch, parent.partOf.get(branch));
+				}
+			}
+			
+			dag.childLessTxs.remove(parent);
 		}
 		
 		if(loadedParents.size() == 1) {
@@ -95,7 +107,7 @@ public class LoadedTransaction extends Transaction {
 		
 		this.dag = dag;
 		
-		parentsConfirmed = true;
+		//parentsConfirmed = true;
 		status = TxStatus.CONFIRMED;
 		
 		dag.mainChain.add(this);
@@ -125,30 +137,31 @@ public class LoadedTransaction extends Transaction {
 				for(LoadedTransaction parentChainMember : parent.getMainBranch().getMembersBefore(parent))
 					parentChainMember.branchs.put(branch, modifierForParents);
 			
-			return;
-		}
-		
-		LoadedTransaction parent = loadedParents.get(0);
-		
-		if(parent.childs.size() == 1) {//transaction is parent's first child, make part of parent's main branch
-			Branch parentMainBranch = parent.getMainBranch();
-			branchs.put(parentMainBranch, new WeightModifier(Modifier.SUB, parentMainBranch.addTx(this)));
-		} else {
+		}else {
 			
-			WeightModifier modifierForAll = new WeightModifier(Modifier.NONE, 0);
+			LoadedTransaction parent = loadedParents.get(0);
 			
-			//create branch
-			Branch branch = new Branch();
-			branch.addTx(this);
-			branchs.put(branch, modifierForAll);
-			
-			//add branch to parent transactions branchs
-			for(LoadedTransaction parentChainMember : parent.getMainBranch().getMembersBefore(parent))
-				parentChainMember.branchs.put(branch, modifierForAll);
+			if(parent.childs.size() == 1) {//transaction is parent's first child, make part of parent's main branch
+				Branch parentMainBranch = parent.getMainBranch();
+				branchs.put(parentMainBranch, new WeightModifier(Modifier.SUB, parentMainBranch.addTx(this)));
+			} else {
+				
+				WeightModifier modifierForAll = new WeightModifier(Modifier.NONE, 0);
+				
+				//create branch
+				Branch branch = new Branch();
+				branch.addTx(this);
+				branchs.put(branch, modifierForAll);
+				
+				//add branch to parent transactions branchs
+				for(LoadedTransaction parentChainMember : parent.getMainBranch().getMembersBefore(parent))
+					parentChainMember.branchs.put(branch, modifierForAll);
 
-			
-			if(dag.mainChain.contains(parent))
-				dag.nodesToCheck.put(parent.ceilingValue, parent);
+				
+				if(dag.mainChain.contains(parent))
+					dag.nodesToCheck.put(parent.ceilingValue, parent);
+				
+			}
 			
 		}
 		
@@ -158,82 +171,32 @@ public class LoadedTransaction extends Transaction {
 	
 	public boolean isChildOf(LoadedTransaction target) {
 		
-		for(Branch branch : partOf.keySet()) {
+		for(Branch branch : target.partOf.keySet())
+			if(partOf.containsKey(branch)) {
+				if(partOf.get(branch) < target.partOf.get(branch))
+					return false;
+				
+			} else return false;
 			
-			if(target.partOf.containsKey(branch))
-				if(branch.positionOf(this) > branch.positionOf(target))
-					return true;
-			
-		}
 		
-		return false;
-		
-		/**boolean whatToreturn = false;
-		
-		if(loadedParents.contains(target))
-			whatToreturn = true;
-		
-		for(LoadedTransaction parent : loadedParents)
-			if(parent.isChildOf(target))
-				whatToreturn = true;
-		
-		return false;
-		
-		/**for(LoadedTransaction parent : loadedParents) {
-			if(parent == target)
-				return true;
-			if(dag.mainChain.contains(parent)) {
-				if(target.ceilingValue <= parent.ceilingValue)
-					return true;
-			} else {
-				if((target.ceilingValue != 0 || parent.ceilingValue == 0) && parent.isChildOf(target))
-					return true;
-			}
+		return true;
 
-		}		
-		return false;**/
-		/**for(Branch branch : partOf.keySet()) {
-			
-			if(target.partOf.containsKey(branch))
-				if(target.partOf.get(branch) <= partOf.get(branch))
-					return true;
-			
-		}
-		return false;**/
 	}
 	
 	public void addChild(LoadedTransaction child) {
 		loadedChilds.add(child);
 		childs.add(child.getUid());
 	}
-
-	/**public void triggerParentMainNode() {
-		
-		for(LoadedTransaction parent : loadedParents) {
-			if(dag.mainChain.contains(parent) && parent.parentsConfirmed) {
-				parent.chooseNextMainNode();
+	
+	public void confirmTx() {
+		for(LoadedTransaction inputTx : loadedInputTxs)
+			if(inputTx.getStatus().isRefused()) {
+				rejectTx();
 				return;
 			}
-		}
-	}**/
-	
-	public boolean confirmTx() {
-		if(status.isPending()) {
+				
 			
-			for(TxOutput input : loadedInputs) {
-				if(!input.usable)
-					return false;
-			}
-			
-			changeStatus(TxStatus.CONFIRMED);
-			for(TxOutput output : getOutputsMap().values())
-				output.usable = true;
-			
-			return true;
-			
-		} else {
-			return true;
-		}
+		changeStatus(TxStatus.CONFIRMED);
 	}
 	
 	public void rejectTx() {
@@ -242,7 +205,7 @@ public class LoadedTransaction extends Transaction {
 		getMainBranch().suppressWeight(this);
 	}
 	
-	public boolean confirmParents(long stayIn) {
+	/**public boolean confirmParents(long stayIn) {
 		
 		boolean parentsConfirmed = true;
 		
@@ -259,13 +222,13 @@ public class LoadedTransaction extends Transaction {
 		
 		this.parentsConfirmed = parentsConfirmed;
 		return parentsConfirmed;
-	}
+	}**/
 	
 	private void checkNode() {
 		
-		if(!parentsConfirmed)
-			confirmParents(ceilingValue);
-		confirmTx();
+		/**if(!parentsConfirmed)
+			confirmParents();
+		confirmTx();**/
 		
 		if(loadedChilds.size() == 0) {
 			dag.nodesToCheck.put(ceilingValue, this);
@@ -278,7 +241,7 @@ public class LoadedTransaction extends Transaction {
 			loadedChilds.get(0).checkNode();
 			return;
 		} else {
-			
+			System.out.println("conflict ongoing");
 			//get child that is MCn
 			LoadedTransaction mainChainNodeChild = null;
 			
@@ -290,106 +253,74 @@ public class LoadedTransaction extends Transaction {
 			}
 			
 			if(mainChainNodeChild == null) {
-				
+				//can't happen ?
 				for(LoadedTransaction child : loadedChilds) {
-					if(mainChainNodeChild == null || child.getWeight(true) > mainChainNodeChild.getWeight(false))
+					if(mainChainNodeChild == null || child.getWeight(true, true) > mainChainNodeChild.getWeight(false))
 						mainChainNodeChild = child;
 				}
 				
-			}
+			}else {
 			
-			for(LoadedTransaction child : loadedChilds) {
-				if(child == mainChainNodeChild)
-					continue;
-				
-				if(child.getWeight(true) > mainChainNodeChild.getWeight(false)) {
-					if(child.getWeight(true) > mainChainNodeChild.getWeight(true)) {
-						
-						//undo main chain from here
-						for(int i = dag.mainChain.indexOf(this)+1; i < dag.mainChain.size(); i++) {
-							LoadedTransaction childMCNode = dag.mainChain.get(i);
-							childMCNode.undoMainChain(ceilingValue);
+				for(LoadedTransaction child : loadedChilds) {
+					if(child == mainChainNodeChild)
+						continue;
+					
+					if(child.getWeight(true, true) > mainChainNodeChild.getWeight(false)) {
+						if(child.getWeight(false) > mainChainNodeChild.getWeight(true, true)) {
+							System.out.println("undoing mainchain");
+							//undo main chain from here
+							for(int i = dag.mainChain.indexOf(this)+1; i < dag.mainChain.size(); i++) {
+								LoadedTransaction childMCNode = dag.mainChain.get(i);
+								childMCNode.undoMainChain(ceilingValue);
+								
+								dag.mainChain.remove(i);
+							}
 							
-							dag.mainChain.remove(i);
+							dag.mainChain.add(child);
+							child.setCeilingAndClaimInputs(ceilingValue+1);
+							child.checkNode();
+							return;
 						}
-						
-						dag.mainChain.add(child);
-						child.setCeilingAndClaimInputs(ceilingValue+1);
-						child.checkNode();
-						
 					}
+					
 				}
 				
 			}
 			
 			boolean hasAllTips = true;
 			//do another for because mainChainNodeChild could have changed during last for
+			outer:
 			for(LoadedTransaction child : loadedChilds) {
 				if(child == mainChainNodeChild)
 					continue;
 				
 				for(LoadedTransaction tip : dag.getTips())
-					if(tip.isChildOf(child)) {
+					if(tip.equals(child) || tip.isChildOf(child))
 						if(!tip.isChildOf(mainChainNodeChild)) {
 							hasAllTips = false;
-							break;
+							break outer;
 						}
-							
-					}
-			}
-			
-			if(!hasAllTips) {
-				dag.nodesToCheck.put(ceilingValue, this);
-				mainChainNodeChild.checkNode();
-			}
 				
+			}
 			
+			if(!hasAllTips)
+				dag.nodesToCheck.put(ceilingValue, this);
+			
+				
+			mainChainNodeChild.checkNode();
 		}
 		
 		
 		
 	}
 	
-	/**public void chooseNextMainNode() {
-		
-		if(!parentsConfirmed)
-			confirmParents(ceilingValue);
-		confirmTx();
-		
-		LoadedTransaction nextMainNode = null;
-		
-		if(loadedChilds.size() == 0)
-			return;
-		
-		for(LoadedTransaction child : loadedChilds) {
-			if(nextMainNode == null || child.weight > nextMainNode.weight)
-				nextMainNode = child;
-		}
-		
-		if(dag.mainChain.contains(nextMainNode)) {
-			nextMainNode.chooseNextMainNode();
-			return;
-		}
-			
-		//the current tx is not the latest node of the MC, we need to cancel child nodes
-		if(dag.mainChain.indexOf(this) != dag.mainChain.size()-1) {
-			
-			for(int i = dag.mainChain.indexOf(this)+1; i < dag.mainChain.size(); i++) {
-				LoadedTransaction childMCNode = dag.mainChain.get(i);
-				childMCNode.undoMainChain(ceilingValue);
-				
-				dag.mainChain.remove(i);
-			}
-			
-		}
-		
-		dag.mainChain.add(nextMainNode);
-		nextMainNode.setCeilingAndClaimInputs(ceilingValue+1);
-	}**/
 	
 	public void setCeilingAndClaimInputs(long value) {
 		if(ceilingValue != 0 || isGenesis())
 			return;
+		
+		for(LoadedTransaction parent : loadedParents)
+			parent.setCeilingAndClaimInputs(value);
 		
 		ceilingValue = value;
 		
@@ -420,12 +351,11 @@ public class LoadedTransaction extends Transaction {
 				input.claimedBy = getUid();
 				input.claimedByLoaded = this;
 			}
+			
+			confirmTx();
 		} else {
 			rejectTx();
 		}
-		
-		for(LoadedTransaction parent : loadedParents)
-			parent.setCeilingAndClaimInputs(value);
 		
 	}
 	
@@ -437,11 +367,13 @@ public class LoadedTransaction extends Transaction {
 			getMainBranch().addWeight(this);
 		} else {
 			
-			for(TxOutput output : getOutputsMap().values()) {
-				output.usable = false;
-				output.claimedBy = "";
-				output.claimedByLoaded = null;
-			}	
+			for(TxOutput input : loadedInputs) {
+				if(input.claimedByLoaded == this) {
+					input.claimedByLoaded = null;
+					input.claimedBy = "";
+				}
+					
+			}
 			
 		}
 		
@@ -522,19 +454,24 @@ public class LoadedTransaction extends Transaction {
 	public LoadedTransaction getLoadedParent(int index) {
 		return loadedParents.get(index);
 	}
-
+	
 	public long getWeight(boolean recalculateIfOutdated) {
-		if(dagHeightOnLastWeightUpdate == dag.loadedTxsCount() || recalculateIfOutdated == false)
+		return getWeight(recalculateIfOutdated, false);
+	}
+
+	public long getWeight(boolean recalculateIfOutdated, boolean forceUpdate) {
+		if(!forceUpdate && (dagHeightOnLastWeightUpdate == dag.loadedTxsCount() || recalculateIfOutdated == false))
 			return weight;
 		
 		long newWeight = 0;
-		
+
 		for(Entry<Branch, WeightModifier> branchEntry : branchs.entrySet()) {
 			
 			if(branchEntry.getKey().equals(getMainBranch()))
 				newWeight += branchEntry.getValue().apply(branchEntry.getKey().getBranchWeight());
 			else
-				newWeight += branchEntry.getValue().apply(branchEntry.getKey().getFirst().getWeight(true));
+				newWeight += branchEntry.getValue().apply(branchEntry.getKey().getFirst().getWeight(true, forceUpdate));
+			
 		}
 		
 		weight = newWeight;

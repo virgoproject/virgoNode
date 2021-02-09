@@ -26,12 +26,10 @@ public class Server {
         		
             	Response response = new Response(405, "");// 405 Method Not Allowed
             	
-            	System.out.println(requestedServlet);
-        		
             	switch(requestedServlet) {
         			
-        			case "addrtxs":
-        				response = AddrTxsServlet.GET(requestArguments);
+        			case "address":
+        				response = AddressServlet.GET(requestArguments);
         				break;
         				
 	        		case "tx":
@@ -41,7 +39,13 @@ public class Server {
 	        		case "nodeinfos":
 	        			response = NodeInfosServlet.GET();
 	        			break;
-        		
+	        			
+	        		case "tips":
+	        			response = TipsServlet.GET();
+	        			break;
+	        		
+	        		
+	        			
         		}
         		
                 exchange.sendResponseHeaders(response.getResponseCode(), response.getResponseBodyBytes().length);

@@ -45,8 +45,9 @@ public class TxLoader implements Runnable{
 						
 					} else throw new JSONException("");
 					
-				} catch (JSONException | SQLException e) {
+				} catch (JSONException | SQLException | IllegalArgumentException e) {
 					Peers.askTxs(Arrays.asList(txUid));
+					e.printStackTrace();
 				}				
 				
 			} catch (InterruptedException e) {

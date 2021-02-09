@@ -1,6 +1,5 @@
 package io.virgo.virgoNode.DAG;
 
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -23,7 +22,7 @@ public class Transaction {
 	private String[] parentsUid;
 	private String[] inputsUid;
 	
-	private Map<String, TxOutput> outputs;
+	private LinkedHashMap<String, TxOutput> outputs;
 	
 	private long date;
 	
@@ -56,7 +55,6 @@ public class Transaction {
 			outputsValue += out.getAmount();
 		}
 		
-		this.outputs = Collections.unmodifiableMap(this.outputs);
 	}
 	
 	/*
@@ -78,7 +76,6 @@ public class Transaction {
 		isGenesis = true;
 		returnAmount = 0;
 		
-		this.outputs = Collections.unmodifiableMap(this.outputs);
 	}
 	
 	public Transaction(Transaction baseTransaction) {
@@ -140,8 +137,8 @@ public class Transaction {
 	/**
 	 * Non modifiable map
 	 */
-	public Map<String, TxOutput> getOutputsMap() {
-		return outputs;
+	public LinkedHashMap<String, TxOutput> getOutputsMap() {
+		return new LinkedHashMap<String, TxOutput>(outputs);
 	}
 
 	public long getDate() {

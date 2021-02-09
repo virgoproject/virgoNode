@@ -38,7 +38,7 @@ public class DAG {
 	protected NavigableMap<Long, LoadedTransaction> nodesToCheck = Collections.synchronizedNavigableMap(new TreeMap<Long, LoadedTransaction>());
 	ConcurrentHashMap<String, List<OrphanTransaction>> waitedTxs = new ConcurrentHashMap<String, List<OrphanTransaction>>();
 	protected List<String> waitingTxsUids = Collections.synchronizedList(new ArrayList<String>());
-	private List<LoadedTransaction> childLessTxs = Collections.synchronizedList(new ArrayList<LoadedTransaction>());
+	List<LoadedTransaction> childLessTxs = Collections.synchronizedList(new ArrayList<LoadedTransaction>());
 	
 	public TxWriter writer;
 	public TxLoader loader;
@@ -56,7 +56,6 @@ public class DAG {
 		(new Thread(eventListener)).start();
 		
 		TxOutput out = new TxOutput("V2N5tYdd1Cm1xqxQDsY15x9ED8kyAUvjbWv", Main.TOTALUNITS, "", "");
-		out.usable = true;
 		
 		TxOutput[] genesisOutputs = {out};
 		
@@ -258,9 +257,6 @@ public class DAG {
 		LoadedTransaction loadedTx = new LoadedTransaction(this, tx, loadedParents.toArray(new LoadedTransaction[loadedParents.size()]), loadedInputs.toArray(new LoadedTransaction[loadedInputs.size()]));
 		
 		loadedTransactions.put(loadedTx.getUid(), loadedTx);
-		childLessTxs.add(loadedTx);
-		for(LoadedTransaction parent : loadedTx.getLoadedParents())
-				childLessTxs.remove(parent);
 		
 		if(!loadedTx.isSaved())
 			loadedTx.save();

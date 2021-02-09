@@ -13,7 +13,6 @@ public class TxOutput {
 	private long amount;
 	public String claimedBy = "";
 	public LoadedTransaction claimedByLoaded;
-	public boolean usable;//if related tx is confirmed
 	
 	public TxOutput(String address, long amount, String originTx, String originAddress) {
 		this.address = address;

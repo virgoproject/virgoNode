@@ -29,7 +29,8 @@ public class OnGetTxsState {
 				
 				txState.put("status", tx.getStatus().ordinal());
 				txState.put("stability", tx.getStability());
-				
+				txState.put("weight", tx.getWeight(true));
+
 				JSONArray txOutputs = new JSONArray();
 				
 				for(TxOutput out : tx.getOutputsMap().values()) {

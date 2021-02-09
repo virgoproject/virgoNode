@@ -31,6 +31,10 @@ public class WeightModifier {
 		}
 	}
 	
+	public WeightModifier.Modifier getModifier(){
+		return modifier;
+	}
+	
 	public long getValue() {
 		return value;
 	}

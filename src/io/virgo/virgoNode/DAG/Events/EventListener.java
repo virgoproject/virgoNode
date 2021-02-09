@@ -1,8 +1,10 @@
 package io.virgo.virgoNode.DAG.Events;
 
+import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import io.virgo.virgoNode.DAG.DAG;
+import io.virgo.virgoNode.DAG.TxOutput;
 
 public class EventListener implements Runnable {
 	
@@ -26,12 +28,21 @@ public class EventListener implements Runnable {
 			dag.infos.getAddressInfos(e.affectedTransaction.getAddress()).addTx(e.affectedTransaction);
 		}catch(IllegalArgumentException exc) { }
 		
-		e.affectedTransaction.getOutputsMap().forEach((k,v) -> dag.infos.getAddressInfos(k).addTx(e.affectedTransaction));
+		Map<String, TxOutput> outputs = e.affectedTransaction.getOutputsMap();
+		outputs.remove(e.affectedTransaction.getAddress());//remove return output from map as it has already been processed just before if it exists
+		
+		outputs.forEach((k,v) -> dag.infos.getAddressInfos(k).addTx(e.affectedTransaction));
+		
+		dag.infos.addTransaction(e.affectedTransaction);
 	}
 	
 	public void onTransactionStatusChanged(TransactionStatusChangedEvent e) {
 		dag.infos.getAddressInfos(e.affectedTransaction.getAddress()).updateTx(e.affectedTransaction, e.newStatus, e.formerStatus);
-		e.affectedTransaction.getOutputsMap().forEach((k,v) -> dag.infos.getAddressInfos(k).updateTx(e.affectedTransaction, e.newStatus, e.formerStatus));
+		
+		Map<String, TxOutput> outputs = e.affectedTransaction.getOutputsMap();
+		outputs.remove(e.affectedTransaction.getAddress());//remove return output from map as it has already been processed just before if it exists
+		
+		outputs.forEach((k,v) -> dag.infos.getAddressInfos(k).updateTx(e.affectedTransaction, e.newStatus, e.formerStatus));
 	}
 
 

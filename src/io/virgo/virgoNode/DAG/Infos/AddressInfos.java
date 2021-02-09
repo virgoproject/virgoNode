@@ -3,6 +3,7 @@ package io.virgo.virgoNode.DAG.Infos;
 import java.util.ArrayList;
 
 import io.virgo.virgoNode.DAG.LoadedTransaction;
+import io.virgo.virgoNode.DAG.TxOutput;
 import io.virgo.virgoNode.DAG.TxStatus;
 
 public class AddressInfos {
@@ -25,21 +26,43 @@ public class AddressInfos {
 	 */
 	public void addTx(LoadedTransaction tx) {
 		
-		if(tx.getAddress().equals(address) && !outputTxs.contains(tx.getUid())) {//sent
+		if(inputTxs.contains(tx.getUid()) || outputTxs.contains(tx.getUid()))
+			return;
+
+		//calculate this transaction's impact on the address balance
+		
+		long total = 0;
+		
+		if(tx.getAddress().equals(getAddress()))//we are sending funds
+			//get every input transaction and substract it's value from total
+			total -= tx.getTotalInput();
+		
+		//get the return output and add it to total, also add tx to inputs because there is something to spend on it
+		TxOutput returnOutput = tx.getOutputsMap().get(getAddress());
+		if(returnOutput != null) {
+			total += returnOutput.getAmount();
+			inputTxs.add(tx.getUid());
+		}
+		
+		System.out.println("added " + tx.getUid() + " total for " + address + " is " +  total);
+		
+		//this transaction had something to do with this address
+		if(total > 0) {
+			//input transaction
+			if(tx.getStatus().isConfirmed())
+				totalReceived += total;
 			
+				
+		}else if(total < 0){
+			//output transaction
 			outputTxs.add(tx.getUid());
 			
 			if(tx.getStatus().isConfirmed())
-				totalSent += tx.getOutputsValue() - tx.getReturnAmount();
+				totalSent += Math.abs(total);
 			
-		}else if(tx.getOutputsMap().containsKey(address) && !inputTxs.contains(tx.getUid())) {//received
-			
-			inputTxs.add(tx.getUid());
-			
-			if(tx.getStatus().isConfirmed())
-				totalReceived += tx.getOutputsMap().get(address).getAmount();
-			
+				
 		}
+		
 		
 	}
 	
@@ -47,31 +70,52 @@ public class AddressInfos {
 		if(tx == null)
 			return;
 		
-		if(inputTxs.contains(tx.getUid())) {//received
-			if(formerStatus.isPending()) {
+		long total = 0;
+		
+		if(tx.getAddress().equals(getAddress()))//we are sending funds
+			//get every input transaction and substract it's value from total
+			total -= tx.getTotalInput();
+		
+		//get the return output and add it to total, also add tx to inputs because there is something to spend on it
+		TxOutput returnOutput = tx.getOutputsMap().get(getAddress());
+		if(returnOutput != null) {
+			total += returnOutput.getAmount();
+			if(!inputTxs.contains(tx.getUid()))
+				inputTxs.add(tx.getUid());
+		}		
+
+		if(total > 0) {
+			//input transaction
+			if(formerStatus.isPending())
+				if(newStatus.isConfirmed())
+					totalReceived += total;
+			 else {
 				if(newStatus.isConfirmed()) {
-					totalReceived += tx.getOutputsMap().get(address).getAmount();
-				}
-			} else {
-				if(newStatus.isConfirmed()) {
-					totalReceived += tx.getOutputsMap().get(address).getAmount();
+					totalReceived += total;
 				} else {
-					totalReceived -= tx.getOutputsMap().get(address).getAmount();
+					totalReceived -= total;
 				}
 			}
-		}
-		
-		if(outputTxs.contains(tx.getUid())) {//sent
-			if(formerStatus.isPending()) {
-				if(newStatus.isConfirmed())
-					totalSent += tx.getOutputsValue() - tx.getReturnAmount();
 				
-			} else {
+		}else if(total < 0){
+			
+			if(!outputTxs.contains(tx.getUid()))
+				outputTxs.add(tx.getUid());
+			
+			//output transaction
+			total = Math.abs(total);
+			
+			if(formerStatus.isPending()) 
 				if(newStatus.isConfirmed())
-					totalSent += tx.getOutputsValue() - tx.getReturnAmount();
+					totalSent += total;
+				
+			else {
+				if(newStatus.isConfirmed())
+					totalSent += total;
 				else
-					totalSent -= tx.getOutputsValue() - tx.getReturnAmount();
-			}			
+					totalSent -= total;
+			}		
+				
 		}
 		
 	}
