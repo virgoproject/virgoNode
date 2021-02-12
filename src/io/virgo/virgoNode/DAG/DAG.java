@@ -88,8 +88,7 @@ public class DAG {
 					Collection<String> lakingTransactions = waitedTxs.keySet();
 					lakingTransactions.removeAll(waitingTxsUids);
 					Peers.askTxs(lakingTransactions);
-				} else
-					System.out.println("no waited tx");
+				}
 			}
 			
 		}, 10000, 10000);
@@ -155,17 +154,19 @@ public class DAG {
 			throw new IllegalArgumentException("Invalid transaction format");
 		}
 			
+		if(!saved) {
 		
-		ECDSA signer = new ECDSA();
-		ECDSASignature sig = ECDSASignature.fromByteArray(sigBytes);
-		
-		//check if signature is good
-		Sha256Hash TxHash = Sha256.getHash((parents.toString() + inputs.toString() + outputs.toString() + date).getBytes());
-		if(!signer.Verify(TxHash, sig, pubKey)) {
-			processingTransactions.remove(txUid);
-			throw new IllegalArgumentException("Invalid signature");
-		}
+			ECDSA signer = new ECDSA();
+			ECDSASignature sig = ECDSASignature.fromByteArray(sigBytes);
 			
+			//check if signature is good
+			Sha256Hash TxHash = Sha256.getHash((parents.toString() + inputs.toString() + outputs.toString() + date).getBytes());
+			if(!signer.Verify(TxHash, sig, pubKey)) {
+				processingTransactions.remove(txUid);
+				throw new IllegalArgumentException("Invalid signature");
+			}
+			
+		}
 		
 		ArrayList<String> parentsUids = new ArrayList<String>();
 		for(int i = 0; i < parents.length(); i++)

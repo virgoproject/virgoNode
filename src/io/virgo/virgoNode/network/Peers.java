@@ -11,8 +11,6 @@ public class Peers {
 
 	public static void getTips() {
 		
-		System.out.println("we ask for tips");
-		
 		JSONObject message = new JSONObject();
 		message.put("command", "getTips");
 		
@@ -21,8 +19,6 @@ public class Peers {
 	}
 	
 	public static void askTxs(Collection<String> ids) {
-		
-		System.out.println("we ask for " + new JSONArray(ids));
 		
 		JSONObject message = new JSONObject();
 		message.put("command", "askTxs");

@@ -62,7 +62,6 @@ public class TxWriter implements Runnable {
 			
 			try {
 				Transaction tx = queue.take();
-				System.out.println("saving " + tx.getUid());
 				try {
 					Main.getDatabase().insertTx(tx);
 				} catch (SQLException e) {

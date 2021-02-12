@@ -11,8 +11,6 @@ public class OnAskTxs {
 	public static void handle(JSONObject messageJson, Peer peer) {
 		JSONArray txs = messageJson.getJSONArray("ids");
 		
-		System.out.println("peer asking for " + txs.toString());
-		
 		JSONArray foundTxs = new JSONArray();
 		
 		for(int i = 0; i < txs.length(); i++) {

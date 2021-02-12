@@ -44,8 +44,6 @@ public class AddressInfos {
 			inputTxs.add(tx.getUid());
 		}
 		
-		System.out.println("added " + tx.getUid() + " total for " + address + " is " +  total);
-		
 		//this transaction had something to do with this address
 		if(total > 0) {
 			//input transaction

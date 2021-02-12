@@ -205,30 +205,8 @@ public class LoadedTransaction extends Transaction {
 		getMainBranch().suppressWeight(this);
 	}
 	
-	/**public boolean confirmParents(long stayIn) {
-		
-		boolean parentsConfirmed = true;
-		
-		for(LoadedTransaction parent : loadedParents) {
-			if(parent.ceilingValue >= stayIn) {
-				if(!parent.confirmTx())
-					parentsConfirmed = false;
-				if(!parent.parentsConfirmed && !parent.confirmParents(stayIn))
-					parentsConfirmed = false;
-			} else if(!parent.parentsConfirmed) {
-				parentsConfirmed = false;
-			}
-		}
-		
-		this.parentsConfirmed = parentsConfirmed;
-		return parentsConfirmed;
-	}**/
 	
 	private void checkNode() {
-		
-		/**if(!parentsConfirmed)
-			confirmParents();
-		confirmTx();**/
 		
 		if(loadedChilds.size() == 0) {
 			dag.nodesToCheck.put(ceilingValue, this);
@@ -241,7 +219,6 @@ public class LoadedTransaction extends Transaction {
 			loadedChilds.get(0).checkNode();
 			return;
 		} else {
-			System.out.println("conflict ongoing");
 			//get child that is MCn
 			LoadedTransaction mainChainNodeChild = null;
 			
@@ -267,7 +244,6 @@ public class LoadedTransaction extends Transaction {
 					
 					if(child.getWeight(true, true) > mainChainNodeChild.getWeight(false)) {
 						if(child.getWeight(false) > mainChainNodeChild.getWeight(true, true)) {
-							System.out.println("undoing mainchain");
 							//undo main chain from here
 							for(int i = dag.mainChain.indexOf(this)+1; i < dag.mainChain.size(); i++) {
 								LoadedTransaction childMCNode = dag.mainChain.get(i);
@@ -433,8 +409,6 @@ public class LoadedTransaction extends Transaction {
 		
 		stability = (int) (Math.min(ownStab,1)*inputsStability);
 		dagHeightOnLastStabUpdate = dag.loadedTxsCount();
-		
-		System.out.println(getUid() + " " + txweight + " " + inputsStability + " " + ownStab);
 		
 		return stability;
 	}

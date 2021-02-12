@@ -22,8 +22,6 @@ public class OnTxs {
 		
 			String txUid = Converter.Addressify(Converter.hexToBytes(txJson.getString("sig")), Main.TX_IDENTIFIER);
 			
-			System.out.println("received " + txUid);
-			
 			if(Main.getDAG().hasTransaction(txUid))
 				continue;
 			

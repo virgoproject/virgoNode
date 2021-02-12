@@ -47,9 +47,11 @@ public class Main {
 	public static int confirmedTxCount = 0;
 	public static int txsSec = 0;
 	public static int rejectedTxCount = 0;
+	static String[] runningIndicators = {"-", "\\", "|", "/"};
+	static int currentIndicator = 0;
 	
 	/**
-	 * Main function
+	 * Main function called on Application startup
 	 * 
 	 */
 	public static void main(String[] none) {
@@ -61,7 +63,7 @@ public class Main {
 		
 		System.out.println("Loaded config");
 		
-		//init database
+		//init SQLite database, storing received transactions
 		try {
 			db = new Database(dbFileName);
 		}catch(SQLException e) {
@@ -69,7 +71,7 @@ public class Main {
 			System.out.println("Terminating.");
 		}
 
-		//init geoweb, peer to peer networking
+		//init GeoWeb (peer to peer networking) with a NetMessageHandler instance as messageHandler and loaded parameters 
 		//TODO: make Thread pool size configurable
 		try {
 			
@@ -94,6 +96,7 @@ public class Main {
 		
 		System.out.println("Creating DAG");
 		
+		//Initialising DAG (transactions data structure)
 		try {
 			dag = new DAG(tipsSaveInterval);
 		} catch (IOException e) {
@@ -110,18 +113,17 @@ public class Main {
 			e.printStackTrace();
 		}
 		
-		
 		//ugly debug stats
 		new Timer().scheduleAtFixedRate(new TimerTask() {
 
 			@Override
 			public void run() {
 				confirmedTxCount += txsSec;
-				System.out.println(txsSec + " txs/s, " + confirmedTxCount + " in total, " + dag.getPoolSize() + " txs waiting");
-				System.out.println(net.getPeers().size() + " peers");
+				System.out.print("\r " + txsSec + " txs/s | " + confirmedTxCount + " in total | " + dag.getPoolSize() + " txs waiting | " + net.getPeers().size() + " peers " + runningIndicators[currentIndicator]);
 				txsSec = 0;
-					
-				
+				currentIndicator++;
+				if(currentIndicator > 3)
+					currentIndicator = 0;
 			}
 			
 		}, 1000l, 1000l);
@@ -129,7 +131,9 @@ public class Main {
 	}
 	
 	
-	//search for config file and load it, if not found create one using default values
+	/**
+	 * searches for config file and load it, if not found create one using default values
+	 */
 	private static void loadConfig() {
 		
 		File configFile = new File("config.json");

@@ -11,8 +11,6 @@ public class OnInv {
 	public static void handle(JSONObject messageJson, Peer peer) {
 		JSONArray txs = messageJson.getJSONArray("ids");
 		
-		System.out.println("Invited for " + txs);
-		
 		JSONArray wantedTxs = new JSONArray();
 		
 		for(int i = 0; i < txs.length(); i++) {

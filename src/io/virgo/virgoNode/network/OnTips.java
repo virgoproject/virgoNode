@@ -14,8 +14,6 @@ public class OnTips {
 		
 		JSONArray tips = messageJson.getJSONArray("tips");
 		
-		System.out.println("received tips " + tips);
-		
 		ArrayList<String> lakingTxs = new ArrayList<String>();
 		
 		for(int i = 0; i < tips.length(); i++) {

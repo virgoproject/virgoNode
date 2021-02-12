@@ -10,8 +10,6 @@ public class OnGetTips {
 
 	public static void handle(JSONObject messageJson, Peer peer) {
 		
-		System.out.println("peer asking for tips");
-		
 		JSONObject tipsMsg = new JSONObject();	
 		tipsMsg.put("command", "tips");
 		tipsMsg.put("tips", new JSONArray(Main.getDAG().getTipsUids()));
