@@ -14,11 +14,15 @@ import io.virgo.virgoNode.DAG.Events.TransactionStatusChangedEvent;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.DAG.WeightModifier.Modifier;
 
+/**
+ * Object representing a loaded Transaction
+ * Extends base transaction
+ */
 public class LoadedTransaction extends Transaction {
 	
 	private DAG dag;
 	
-	//branchs the transaction is part of and the modifier (ex SUB1000000 or DIV2) applied to calculate weight
+	//branchs the transaction is part of and the modifier (ex. SUB1000000 or DIV2) applied to calculate weight
 	protected LinkedHashMap<Branch, WeightModifier> branchs = new LinkedHashMap<Branch, WeightModifier>();
 	HashMap<Branch, Integer> partOf = new HashMap<Branch, Integer>();//part of branch till
 	
@@ -33,24 +37,15 @@ public class LoadedTransaction extends Transaction {
 	private ArrayList<TxOutput> loadedInputs = new ArrayList<TxOutput>();
 	private ArrayList<LoadedTransaction> loadedInputTxs = new ArrayList<LoadedTransaction>();
 	
-	public ArrayList<LoadedTransaction> loadedOutputClaimers = new ArrayList<LoadedTransaction>();
-
 	private volatile long weight = 0;
 	private long selfWeight = 0;
 	private volatile long dagHeightOnLastWeightUpdate = 0;
 	
-
 	private volatile int stability = 0;
 	private volatile long dagHeightOnLastStabUpdate = 0;
 	
-	
 	private long inputsValue = 0;
-	
-	
-	private ParentsOrder parentsOrder = ParentsOrder.NO_ORDER;
-	
-	//private volatile boolean parentsConfirmed = false;//parents = all transaction before self, not only direct parents
-	
+		
 	private volatile TxStatus status = TxStatus.PENDING;
 	
 	public LoadedTransaction(DAG dag, Transaction baseTransaction, LoadedTransaction[] parents, LoadedTransaction[] inputTxs) {
@@ -62,18 +57,23 @@ public class LoadedTransaction extends Transaction {
 		this.loadedParents.addAll(Arrays.asList(parents));
 		this.loadedInputTxs.addAll(Arrays.asList(inputTxs));
 		
+		//calculate inputs value
 		for(LoadedTransaction inputTx : inputTxs) {
 			TxOutput out = inputTx.getOutputsMap().get(getAddress());
 			loadedInputs.add(out);
-			inputTx.loadedOutputClaimers.add(this);
 			inputsValue += out.getAmount();
 		}
 		
+		//Add this transaction to tips list
 		dag.childLessTxs.add(this);
 		
 		for(LoadedTransaction parent : loadedParents) {
+			//add this transaction to parents's child list
 			parent.addChild(this);
 			
+			//add all branch parent is part of to this transaction branchs list
+			//If a banch is already present in the list take the highest position
+			//See documentation on virgocoin.io for more informations
 			for(Branch branch : parent.partOf.keySet()) {
 				if(partOf.containsKey(branch)) {
 					if(parent.partOf.get(branch) > partOf.get(branch))
@@ -83,17 +83,19 @@ public class LoadedTransaction extends Transaction {
 				}
 			}
 			
+			//Remove parent from tips list if in it
 			dag.childLessTxs.remove(parent);
 		}
 		
-		if(loadedParents.size() == 1) {
-			parentsOrder = ParentsOrder.ORDERED;
+		//determine transaction height (highest parent+1)
+		if(loadedParents.size() == 1)
 			height = loadedParents.get(0).getHeight() + 1;
-		} else
+		else
 			for(LoadedTransaction parent : loadedParents)
 				if(parent.getHeight() > height)
 					height = parent.getHeight() + 1;
 			
+		
 		selfWeight = getTotalInput() - getOutputsValue();
 		
 		setupBranch();
@@ -107,7 +109,6 @@ public class LoadedTransaction extends Transaction {
 		
 		this.dag = dag;
 		
-		//parentsConfirmed = true;
 		status = TxStatus.CONFIRMED;
 		
 		dag.mainChain.add(this);
@@ -124,9 +125,13 @@ public class LoadedTransaction extends Transaction {
 		dag.getEventListener().notify(new TransactionLoadedEvent(this));
 	}
 	
+	/**
+	 * Setup branching for this transaction
+	 * Branching optimizes weight calculation by forming groups of transaction
+	 */
 	private void setupBranch() {
-		if(getParentsOrder().equals(ParentsOrder.NO_ORDER)) {
-			//create a branch and add it to parents direct branch with mod DIV2
+		if(loadedParents.size() != 1) {
+			//create a branch and add it to parents direct branch with /2 modifier (distibute weight equally between parents)
 			Branch branch = new Branch();
 			branch.addTx(this);
 			branchs.put(branch, new WeightModifier(Modifier.NONE, 0));
@@ -165,10 +170,18 @@ public class LoadedTransaction extends Transaction {
 			
 		}
 		
+		//check oldest mainchain node requiring attention
 		dag.nodesToCheck.pollFirstEntry().getValue().checkNode();
 		
 	}
 	
+	/**
+	 * Checks if this transaction is a direct child of target transaction
+	 * For this we veriffy that this transaction has all parent branchs at a higher or equal branch height
+	 * 
+	 * @param target The target transaction
+	 * @return true if this transaction is a direct child of target, false otherwise
+	 */
 	public boolean isChildOf(LoadedTransaction target) {
 		
 		for(Branch branch : target.partOf.keySet())
@@ -188,6 +201,9 @@ public class LoadedTransaction extends Transaction {
 		childs.add(child.getUid());
 	}
 	
+	/**
+	 * Confirm this transaction if all inputs are free, otherwise reject it
+	 */
 	public void confirmTx() {
 		for(LoadedTransaction inputTx : loadedInputTxs)
 			if(inputTx.getStatus().isRefused()) {
@@ -205,21 +221,27 @@ public class LoadedTransaction extends Transaction {
 		getMainBranch().suppressWeight(this);
 	}
 	
-	
+	/**
+	 * Try to continue mainChain from this transaction
+	 */
 	private void checkNode() {
 		
+		//a mainchain node must have atleast, if it's not the case abort and put back this in nodes to check list
 		if(loadedChilds.size() == 0) {
 			dag.nodesToCheck.put(ceilingValue, this);
 			return;
 		}
 		
+		//if this node has only one child claim inputs from it, add it to mainchain and checkNode from it
 		if(loadedChilds.size() == 1) {
 			dag.mainChain.add(loadedChilds.get(0));
 			loadedChilds.get(0).setCeilingAndClaimInputs(ceilingValue+1);
 			loadedChilds.get(0).checkNode();
 			return;
 		} else {
-			//get child that is MCn
+			//more than one child
+			
+			//get the child that is part of mainchain
 			LoadedTransaction mainChainNodeChild = null;
 			
 			for(LoadedTransaction child : loadedChilds) {
@@ -237,14 +259,15 @@ public class LoadedTransaction extends Transaction {
 				}
 				
 			}else {
-			
+				
+				//check if one of the child has more weight than mainchain child
 				for(LoadedTransaction child : loadedChilds) {
 					if(child == mainChainNodeChild)
 						continue;
 					
 					if(child.getWeight(true, true) > mainChainNodeChild.getWeight(false)) {
 						if(child.getWeight(false) > mainChainNodeChild.getWeight(true, true)) {
-							//undo main chain from here
+							//if so undo main chain from here
 							for(int i = dag.mainChain.indexOf(this)+1; i < dag.mainChain.size(); i++) {
 								LoadedTransaction childMCNode = dag.mainChain.get(i);
 								childMCNode.undoMainChain(ceilingValue);
@@ -252,6 +275,7 @@ public class LoadedTransaction extends Transaction {
 								dag.mainChain.remove(i);
 							}
 							
+							//and add the bigger child to mainchain
 							dag.mainChain.add(child);
 							child.setCeilingAndClaimInputs(ceilingValue+1);
 							child.checkNode();
@@ -263,6 +287,7 @@ public class LoadedTransaction extends Transaction {
 				
 			}
 			
+			//check if all tips are child of this transaction
 			boolean hasAllTips = true;
 			//do another for because mainChainNodeChild could have changed during last for
 			outer:
@@ -279,10 +304,11 @@ public class LoadedTransaction extends Transaction {
 				
 			}
 			
+			//if not potential confilct is still not resolved, continue to check this node
 			if(!hasAllTips)
 				dag.nodesToCheck.put(ceilingValue, this);
 			
-				
+			//check next node
 			mainChainNodeChild.checkNode();
 		}
 		
@@ -290,48 +316,59 @@ public class LoadedTransaction extends Transaction {
 		
 	}
 	
-	
+	/**
+	 * Attribute given ceiling value to this transaction and recursively to it's parents if none attributed yet
+	 * Also try to claim inputs and confirm his transaction
+	 */
 	public void setCeilingAndClaimInputs(long value) {
+		//if already has a ceiling or is genesis stop here
 		if(ceilingValue != 0 || isGenesis())
 			return;
 		
+		//execute this function on parents
 		for(LoadedTransaction parent : loadedParents)
 			parent.setCeilingAndClaimInputs(value);
 		
+		//set ceiling
 		ceilingValue = value;
+		
 		
 		boolean canClaimInputs = true;
 		for(TxOutput input : loadedInputs) {
+			//if input is already claimed
 			if(canClaimInputs && input.claimedByLoaded != null) {
 				
+				//can't claim if input claimer is older than us
 				if(input.claimedByLoaded.ceilingValue < ceilingValue) {
 					canClaimInputs = false;
+				
+				//if claimer has same ceiling as this transaction
 				} else if(input.claimedByLoaded.ceilingValue == ceilingValue) {
 					
+					//if we are a child of claimer we can't claim
 					if(isChildOf(input.claimedByLoaded)) {
 						canClaimInputs = false;
+					//if claimer is not our child unclaim, we neither claim
 					}else if(!input.claimedByLoaded.isChildOf(this)) {
 						canClaimInputs = false;
 						
 						input.claimedByLoaded.rejectTx();
  						input.claimedByLoaded = null;
-						input.claimedBy = "";
 					}
 					
 				}
 			}
 		}
 		
+		//if all inputs are free claim them and confirm transaction, otherwise reject
 		if(canClaimInputs) {
-			for(TxOutput input : loadedInputs) {
-				input.claimedBy = getUid();
+			for(TxOutput input : loadedInputs)
 				input.claimedByLoaded = this;
-			}
 			
 			confirmTx();
-		} else {
-			rejectTx();
-		}
+			
+		} else rejectTx();
+		
 		
 	}
 	
@@ -341,18 +378,11 @@ public class LoadedTransaction extends Transaction {
 		
 		if(status.isRefused()) {//if status = 2 then the transaction hasnt claired it's outputs, we also need to regive weight
 			getMainBranch().addWeight(this);
-		} else {
-			
-			for(TxOutput input : loadedInputs) {
-				if(input.claimedByLoaded == this) {
+		} else
+			for(TxOutput input : loadedInputs)
+				if(input.claimedByLoaded == this)
 					input.claimedByLoaded = null;
-					input.claimedBy = "";
-				}
-					
-			}
 			
-		}
-		
 		changeStatus(TxStatus.PENDING);
 		
 		this.ceilingValue = 0;
@@ -375,6 +405,7 @@ public class LoadedTransaction extends Transaction {
 		JSONObject resume = new JSONObject();
 		resume.put("status", getStatus().getCode());
 		JSONArray inputs = new JSONArray();
+		
 		for(TxOutput input : loadedInputs) {
 			JSONArray inputJSON = new JSONArray();
 			inputJSON.put(input.getOriginTx());
@@ -382,8 +413,6 @@ public class LoadedTransaction extends Transaction {
 			inputs.put(inputJSON);
 		}
 		resume.put("inputs", inputs);
-		
-		
 		
 		return resume;
 	}
@@ -398,10 +427,9 @@ public class LoadedTransaction extends Transaction {
 			return stability;
 		
 		int inputsStability = -1;
-		for(LoadedTransaction input : loadedInputTxs) {
+		for(LoadedTransaction input : loadedInputTxs)
 			if(inputsStability > input.getStability() || inputsStability == -1)
 				inputsStability = input.getStability();
-		}
 
 		long txweight = getWeight(true);
 		
@@ -415,10 +443,6 @@ public class LoadedTransaction extends Transaction {
 	
 	public long getTotalInput() {
 		return inputsValue;
-	}
-	
-	public ParentsOrder getParentsOrder() {
-		return parentsOrder;
 	}
 	
 	public LoadedTransaction[] getLoadedParents() {
@@ -439,14 +463,11 @@ public class LoadedTransaction extends Transaction {
 		
 		long newWeight = 0;
 
-		for(Entry<Branch, WeightModifier> branchEntry : branchs.entrySet()) {
-			
+		for(Entry<Branch, WeightModifier> branchEntry : branchs.entrySet())
 			if(branchEntry.getKey().equals(getMainBranch()))
 				newWeight += branchEntry.getValue().apply(branchEntry.getKey().getBranchWeight());
 			else
 				newWeight += branchEntry.getValue().apply(branchEntry.getKey().getFirst().getWeight(true, forceUpdate));
-			
-		}
 		
 		weight = newWeight;
 		dagHeightOnLastWeightUpdate = dag.loadedTxsCount();

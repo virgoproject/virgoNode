@@ -10,6 +10,9 @@ import io.virgo.virgoCryptoLib.Converter;
 import io.virgo.virgoCryptoLib.ECDSASignature;
 import io.virgo.virgoNode.Main;
 
+/**
+ * Base transaction object, 'raw' data only
+ */
 public class Transaction {
 	
 	private String uid;
@@ -134,9 +137,6 @@ public class Transaction {
 		return inputsUid;
 	}
 	
-	/**
-	 * Non modifiable map
-	 */
 	public LinkedHashMap<String, TxOutput> getOutputsMap() {
 		return new LinkedHashMap<String, TxOutput>(outputs);
 	}
@@ -145,6 +145,9 @@ public class Transaction {
 		return date;
 	}
 	
+	/**
+	 * @return JSON representation of the transaction
+	 */
 	public JSONObject toJSONObject() {
 		JSONObject txJson = new JSONObject();
 		txJson.put("sig", getSignature().toHexString());

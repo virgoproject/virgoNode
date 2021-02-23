@@ -11,7 +11,6 @@ public class TxOutput {
 	private String originTx;
 	private String address;
 	private long amount;
-	public String claimedBy = "";
 	public LoadedTransaction claimedByLoaded;
 	
 	public TxOutput(String address, long amount, String originTx, String originAddress) {
@@ -70,6 +69,6 @@ public class TxOutput {
 	}
 
 	public boolean isSpent() {
-		return claimedBy != "";
+		return claimedByLoaded != null;
 	}
 }
