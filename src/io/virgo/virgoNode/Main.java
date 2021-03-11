@@ -38,10 +38,10 @@ public class Main {
 	public static int tipsSaveInterval = 10000;
 	
 	public static final int DECIMALS = 8;
-	public static final int TOTALCOINS = 32032000;
-	public static final long TOTALUNITS = (long) (TOTALCOINS * Math.pow(10, DECIMALS));
+	public static final long BEACON_REWARD = (long) (5 * Math.pow(10, DECIMALS));
 	public static final byte[] ADDR_IDENTIFIER = new BigInteger("4039").toByteArray();
 	public static final byte[] TX_IDENTIFIER = new BigInteger("3823").toByteArray();
+	public static final long MAX_DIFFICULTY = 72056494526300160l;
 	
 	//ugly debug stats
 	public static int confirmedTxCount = 0;

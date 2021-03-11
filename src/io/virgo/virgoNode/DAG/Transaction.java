@@ -32,6 +32,10 @@ public class Transaction {
 	private long outputsValue = 0;
 	private long returnAmount = 0;
 	
+	//beacon transaction related variables
+	private String parentBeaconUid = null;
+	private long nonce = 0;
+	
 	private boolean isSaved;
 	
 	public Transaction(byte[] pubKey, ECDSASignature signature, String[] parentsUid, String[] inputsUid, TxOutput[] outputs, long date, boolean isSaved) {
@@ -60,6 +64,32 @@ public class Transaction {
 		
 	}
 	
+	public Transaction(byte[] pubKey, ECDSASignature signature, String[] parentsUid, TxOutput[] outputs, String parentBeaconUid, long nonce, long date, boolean isSaved) {
+		
+		uid = Converter.Addressify(signature.toByteArray(), Main.TX_IDENTIFIER);
+		address = Converter.Addressify(pubKey, Main.ADDR_IDENTIFIER);
+		
+		this.pubKey = pubKey;
+		this.signature = signature;
+		this.parentsUid = parentsUid;
+		this.isSaved = isSaved;
+		
+		this.outputs = new LinkedHashMap<String, TxOutput>();
+		
+		this.parentBeaconUid = parentBeaconUid;
+		this.nonce = nonce;
+		
+		this.date = date;
+		
+		for(TxOutput out : outputs) {
+			this.outputs.put(out.getAddress(), out);
+			
+				
+			outputsValue += out.getAmount();
+		}
+		
+	}
+	
 	/*
 	 * genesis constructor
 	 */
@@ -79,6 +109,9 @@ public class Transaction {
 		isGenesis = true;
 		returnAmount = 0;
 		
+		parentBeaconUid = "";
+		nonce = 0;
+		
 	}
 	
 	public Transaction(Transaction baseTransaction) {
@@ -94,6 +127,8 @@ public class Transaction {
 		this.uid = baseTransaction.getUid();
 		this.address = baseTransaction.getAddress();
 		this.isGenesis = baseTransaction.isGenesis();
+		this.parentBeaconUid = baseTransaction.getParentBeaconUid();
+		this.nonce = baseTransaction.getNonce();
 	}
 
 
@@ -121,6 +156,10 @@ public class Transaction {
 		return isSaved;
 	}
 	
+	public boolean isBeaconTransaction() {
+		return parentBeaconUid != null;
+	}
+	
 	public long getReturnAmount() {
 		return returnAmount;
 	}
@@ -135,6 +174,14 @@ public class Transaction {
 	
 	public String[] getInputsUids() {
 		return inputsUid;
+	}
+	
+	public String getParentBeaconUid() {
+		return parentBeaconUid;
+	}
+	
+	public long getNonce() {
+		return nonce;
 	}
 	
 	public LinkedHashMap<String, TxOutput> getOutputsMap() {
@@ -153,7 +200,13 @@ public class Transaction {
 		txJson.put("sig", getSignature().toHexString());
 		txJson.put("pubKey", Converter.bytesToHex(getPublicKey()));
 		txJson.put("parents", new JSONArray(getParentsUids()));
-		txJson.put("inputs", new JSONArray(getInputsUids()));
+		
+		if(!isBeaconTransaction())
+			txJson.put("inputs", new JSONArray(getInputsUids()));
+		else {
+			txJson.put("parentBeacon", getParentBeaconUid());
+			txJson.put("nonce", getNonce());
+		}
 		
 		JSONArray outputsJson = new JSONArray();
 		for(Map.Entry<String, TxOutput> entry : getOutputsMap().entrySet())

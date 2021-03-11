@@ -24,16 +24,9 @@ public class OnTxs {
 			
 			if(Main.getDAG().hasTransaction(txUid))
 				continue;
-			
-			byte[] sigBytes = Converter.hexToBytes(txJson.getString("sig"));
-			byte[] pubKey = Converter.hexToBytes(txJson.getString("pubKey"));
-			JSONArray parents = txJson.getJSONArray("parents");
-			JSONArray inputs = txJson.getJSONArray("inputs");
-			JSONArray outputs = txJson.getJSONArray("outputs");
-			long date = txJson.getLong("date");
-			
+
 			try {
-				Main.getDAG().initTx(sigBytes, pubKey, parents, inputs, outputs, date, false);
+				Main.getDAG().initTx(txJson, false);
 				
 				if(messageJson.has("callback")) {
 					JSONObject txCallback = new JSONObject();	

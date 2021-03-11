@@ -28,8 +28,7 @@ public class OnGetTxsState {
 				LoadedTransaction tx = Main.getDAG().getLoadedTx(uid);
 				
 				txState.put("status", tx.getStatus().ordinal());
-				txState.put("stability", tx.getStability());
-				txState.put("weight", tx.getWeight(true));
+				txState.put("confirmations", tx.confirmationCount());
 
 				JSONArray txOutputs = new JSONArray();
 				

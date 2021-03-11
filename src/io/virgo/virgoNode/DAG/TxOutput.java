@@ -1,6 +1,7 @@
 package io.virgo.virgoNode.DAG;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
 
 import io.virgo.virgoCryptoLib.Converter;
 import io.virgo.virgoNode.Main;
@@ -11,7 +12,7 @@ public class TxOutput {
 	private String originTx;
 	private String address;
 	private long amount;
-	public LoadedTransaction claimedByLoaded;
+	public ArrayList<LoadedTransaction> claimers = new ArrayList<LoadedTransaction>();
 	
 	public TxOutput(String address, long amount, String originTx, String originAddress) {
 		this.address = address;
@@ -69,6 +70,10 @@ public class TxOutput {
 	}
 
 	public boolean isSpent() {
-		return claimedByLoaded != null;
+		for(LoadedTransaction claimer : claimers) {
+			if(claimer.getStatus().isConfirmed())
+				return true;
+		}
+		return false;
 	}
 }

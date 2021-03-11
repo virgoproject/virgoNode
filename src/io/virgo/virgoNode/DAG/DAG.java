@@ -22,6 +22,7 @@ import io.virgo.virgoCryptoLib.ECDSA;
 import io.virgo.virgoCryptoLib.ECDSASignature;
 import io.virgo.virgoCryptoLib.Sha256;
 import io.virgo.virgoCryptoLib.Sha256Hash;
+import io.virgo.virgoCryptoLib.Utils;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.DAG.Events.EventListener;
 import io.virgo.virgoNode.DAG.Infos.DAGInfos;
@@ -37,12 +38,13 @@ import io.virgo.virgoNode.network.Peers;
 public class DAG {
 
 	private List<String> processingTransactions = Collections.synchronizedList(new ArrayList<String>());
-	private ConcurrentHashMap<String, LoadedTransaction> loadedTransactions = new ConcurrentHashMap<String, LoadedTransaction>();
-	protected List<LoadedTransaction> mainChain = Collections.synchronizedList(new ArrayList<LoadedTransaction>());
-	protected NavigableMap<Long, LoadedTransaction> nodesToCheck = Collections.synchronizedNavigableMap(new TreeMap<Long, LoadedTransaction>());
+	private ConcurrentHashMap<String, LoadedTransaction> loadedTransactions = new ConcurrentHashMap<String, LoadedTransaction>();	protected NavigableMap<Long, LoadedTransaction> nodesToCheck = Collections.synchronizedNavigableMap(new TreeMap<Long, LoadedTransaction>());
 	ConcurrentHashMap<String, List<OrphanTransaction>> waitedTxs = new ConcurrentHashMap<String, List<OrphanTransaction>>();
 	protected List<String> waitingTxsUids = Collections.synchronizedList(new ArrayList<String>());
 	List<LoadedTransaction> childLessTxs = Collections.synchronizedList(new ArrayList<LoadedTransaction>());
+	List<LoadedTransaction> childLessBeacons = Collections.synchronizedList(new ArrayList<LoadedTransaction>());
+
+	private LoadedTransaction genesis;
 	
 	public TxWriter writer;
 	public TxLoader loader;
@@ -61,10 +63,10 @@ public class DAG {
 		(new Thread(eventListener)).start();
 		
 		//Add genesis transaction to DAG
-		TxOutput out = new TxOutput("V2N5tYdd1Cm1xqxQDsY15x9ED8kyAUvjbWv", Main.TOTALUNITS, "", "");
+		TxOutput out = new TxOutput("V2N5tYdd1Cm1xqxQDsY15x9ED8kyAUvjbWv", (long) (100000 * Math.pow(10, Main.DECIMALS)), "", "");
 		TxOutput[] genesisOutputs = {out};
 		
-		LoadedTransaction genesis = new LoadedTransaction(this, genesisOutputs);
+		genesis = new LoadedTransaction(this, genesisOutputs);
 		loadedTransactions.put(genesis.getUid(), genesis);
 		childLessTxs.add(genesis);
 		
@@ -137,14 +139,16 @@ public class DAG {
 		return loadedTransactions.get(hash);
 	}
 	
-	/**
-	 * Initiate transaction from raw data
-	 * Includes checks for data and signature validity 
-	 */
-	public void initTx(byte[] sigBytes, byte[] pubKey, JSONArray parents, JSONArray inputs, JSONArray outputs, long date, boolean saved) throws IllegalArgumentException {
+	
+	public void initTx(JSONObject txJson, boolean saved) throws JSONException, IllegalArgumentException {
+		
+		byte[] sigBytes = Converter.hexToBytes(txJson.getString("sig"));
+		byte[] pubKey = Converter.hexToBytes(txJson.getString("pubKey"));
+		JSONArray parents = txJson.getJSONArray("parents");
+		JSONArray outputs = txJson.getJSONArray("outputs");
+		long date = txJson.getLong("date");
 		
 		String txUid = Converter.Addressify(sigBytes, Main.TX_IDENTIFIER);
-		String address = Converter.Addressify(pubKey, Main.ADDR_IDENTIFIER);
 		
 		//Ensure transaction isn't processed yet
 		if(loadedTransactions.containsKey(txUid) || waitingTxsUids.contains(txUid))
@@ -157,6 +161,193 @@ public class DAG {
 			else
 				processingTransactions.add(txUid);
 		}
+		
+		//transaction is a beacon transaction
+		if(txJson.has("parentBeacon")) {
+		
+			String parentBeacon = txJson.getString("parentBeacon");
+			long nonce = txJson.getLong("nonce");
+		
+			initBeaconTx(sigBytes, pubKey, parents, outputs, parentBeacon, nonce, date, saved);
+			
+		//regular transaction
+		}else {
+			JSONArray inputs = txJson.getJSONArray("inputs");
+			
+			initTx(sigBytes, pubKey, parents, inputs, outputs, date, saved);
+		}
+			
+		
+		
+	}
+	
+	public void initBeaconTx(byte[] sigBytes, byte[] pubKey, JSONArray parents, JSONArray outputs, String parentBeacon, long nonce, long date, boolean saved) {
+		
+		String txUid = Converter.Addressify(sigBytes, Main.TX_IDENTIFIER);
+		String address = Converter.Addressify(pubKey, Main.ADDR_IDENTIFIER);
+		
+		JSONArray[] cleanedTx = cleanTx(parents, new JSONArray(), outputs);
+		parents = cleanedTx[0];
+		outputs = cleanedTx[2];
+		
+		//beacon transaction must have only one output
+		if(outputs.length() != 1) {
+			processingTransactions.remove(txUid);
+			return;
+		}
+		
+		if(!Utils.validateAddress(parentBeacon, Main.TX_IDENTIFIER) || parents.isEmpty()) {
+			processingTransactions.remove(txUid);
+			throw new IllegalArgumentException("Invalid transaction format");
+		}
+		
+		Sha256Hash txHash = Sha256.getDoubleHash((parents.toString() + outputs.toString() + parentBeacon + date + nonce).getBytes());
+		
+		//check if signature is valid, bypass this check if transaction is coming from disk		
+		if(!saved) {
+		
+			ECDSA signer = new ECDSA();
+			ECDSASignature sig = ECDSASignature.fromByteArray(sigBytes);
+			
+			if(!signer.Verify(txHash, sig, pubKey)) {
+				processingTransactions.remove(txUid);
+				throw new IllegalArgumentException("Invalid signature");
+			}
+			
+		}
+		
+		//Convert parents JSON to string array
+		ArrayList<String> parentsUids = new ArrayList<String>();
+		for(int i = 0; i < parents.length(); i++)
+			parentsUids.add(parents.getString(i));
+		
+		//Build TxOutput objects for this transaction
+		ArrayList<TxOutput> constructedOutput = new ArrayList<TxOutput>();
+		
+		TxOutput output = TxOutput.fromString(outputs.getString(0), txUid, address);
+		constructedOutput.add(output);
+		
+		if(output.getAmount() != Main.BEACON_REWARD) {
+			processingTransactions.remove(txUid);
+			return;
+		}
+		
+		//Create corresponding Transaction object
+		Transaction tx = new Transaction(pubKey, ECDSASignature.fromByteArray(sigBytes),
+				parentsUids.toArray(new String[parentsUids.size()]),
+				constructedOutput.toArray(new TxOutput[1]),
+				parentBeacon, nonce, date, saved);
+		
+		initBeaconTx(tx);
+		
+	}
+	
+	public void initBeaconTx(Transaction tx) {
+		
+		ArrayList<String> waitedTxs = new ArrayList<String>();
+		
+		//Check for missing parents 
+		ArrayList<LoadedTransaction> loadedParents = new ArrayList<LoadedTransaction>();
+		for(String parentTxUid : tx.getParentsUids()) {
+			LoadedTransaction parentTx = getLoadedTx(parentTxUid);
+			if(parentTx == null)
+				waitedTxs.add(parentTxUid);
+			else
+				loadedParents.add(parentTx);
+		}
+		
+		//check for missing parent beacon
+		LoadedTransaction parentBeacon = getLoadedTx(tx.getParentBeaconUid());
+		if(parentBeacon == null)
+			waitedTxs.add(tx.getParentBeaconUid());
+		
+		//if there is any missing transaction (input or parent) try to load them and add this transaction to waiting txs
+		if(!waitedTxs.isEmpty()) {
+			addWaitedTxs(waitedTxs, new OrphanTransaction(tx, waitedTxs.toArray(new String[waitedTxs.size()])));
+			loader.push(waitedTxs);
+			processingTransactions.remove(tx.getUid());
+			return;
+		}
+		
+		//check if transaction has no useless parent
+		if(loadedParents.size() > 1 && (loadedParents.get(0).isChildOf(loadedParents.get(1)) || loadedParents.get(1).isChildOf(loadedParents.get(0)))) {
+			processingTransactions.remove(tx.getUid());
+			return;
+		}
+		
+		//check if transaction timestamp is superior to last 10 blocks median and inferior to current time + 15 minutes
+		ArrayList<Long> timestamps = new ArrayList<Long>();
+		LoadedTransaction currentParent = parentBeacon;
+		for(int i = 0; i < 10; i++) {
+			timestamps.add(currentParent.getDate());
+			currentParent = currentParent.getParentBeacon();
+			
+			//for first 10 blocks
+			if(currentParent == null)
+				break;
+		}
+		
+		timestamps.sort(null);
+		
+		long medianTime = timestamps.get(timestamps.size()/2);
+		
+		if(tx.getDate() < medianTime || tx.getDate() > System.currentTimeMillis()+900000) {
+			processingTransactions.remove(tx.getUid());
+			return;
+		}
+		
+		//check if transaction is effectively child of it's parent beacon
+		boolean childOf = false;
+		for(LoadedTransaction parent : loadedParents)
+			if(parent.isChildOf(parentBeacon)) {
+				childOf = true;
+				break;
+			}
+				
+		if(!childOf) {
+			processingTransactions.remove(tx.getUid());
+			return;
+		}
+		
+		JSONObject txJson = tx.toJSONObject();
+		Sha256Hash txHash = Sha256.getDoubleHash((
+				txJson.getJSONArray("parents").toString()
+				+ txJson.getJSONArray("outputs").toString()
+				+ parentBeacon.getUid()
+				+ tx.getDate()
+				+ tx.getNonce()
+				).getBytes());
+		
+		//check if required difficulty is met
+		if(txHash.toLong() >= Main.MAX_DIFFICULTY/parentBeacon.getDifficulty()) {
+			processingTransactions.remove(tx.getUid());
+			return;
+		}
+		
+		//load transaction to DAG
+		LoadedTransaction loadedTx = new LoadedTransaction(this, tx, loadedParents.toArray(new LoadedTransaction[loadedParents.size()]), parentBeacon);
+		loadedTransactions.put(loadedTx.getUid(), loadedTx);
+		
+		//save transaction if not done yet
+		if(!loadedTx.isSaved())
+			loadedTx.save();
+		
+		//remove transaction from processing ones
+		processingTransactions.remove(tx.getUid());
+		
+		//try to load any transaction that was waiting for this one to load
+		removeWaitedTx(loadedTx.getUid());		
+		
+	}
+	
+	/**
+	 * Initiate regular transaction from raw data
+	 * Includes checks for data and signature validity 
+	 */
+	public void initTx(byte[] sigBytes, byte[] pubKey, JSONArray parents, JSONArray inputs, JSONArray outputs, long date, boolean saved) throws IllegalArgumentException {
+		
+		String txUid = Converter.Addressify(sigBytes, Main.TX_IDENTIFIER);
+		String address = Converter.Addressify(pubKey, Main.ADDR_IDENTIFIER);
 		
 		//Remove any useless data from transaction, if there is then transaction will be refused
 		JSONArray[] cleanedTx = cleanTx(parents, inputs, outputs);
@@ -176,8 +367,8 @@ public class DAG {
 			ECDSA signer = new ECDSA();
 			ECDSASignature sig = ECDSASignature.fromByteArray(sigBytes);
 			
-			Sha256Hash TxHash = Sha256.getHash((parents.toString() + inputs.toString() + outputs.toString() + date).getBytes());
-			if(!signer.Verify(TxHash, sig, pubKey)) {
+			Sha256Hash txHash = Sha256.getDoubleHash((parents.toString() + inputs.toString() + outputs.toString() + date).getBytes());
+			if(!signer.Verify(txHash, sig, pubKey)) {
 				processingTransactions.remove(txUid);
 				throw new IllegalArgumentException("Invalid signature");
 			}
@@ -219,11 +410,9 @@ public class DAG {
 	public void initTx(Transaction tx) {
 		ArrayList<String> waitedTxs = new ArrayList<String>();
 		
-		String[] parentsUids = tx.getParentsUids();
-		
 		//Check for missing parents 
 		ArrayList<LoadedTransaction> loadedParents = new ArrayList<LoadedTransaction>();
-		for(String parentTxUid : parentsUids) {
+		for(String parentTxUid : tx.getParentsUids()) {
 			LoadedTransaction parentTx = getLoadedTx(parentTxUid);
 			if(parentTx == null)
 				waitedTxs.add(parentTxUid);
@@ -252,14 +441,28 @@ public class DAG {
 		}
 		
 		//check if transaction has no useless parent
-		if(loadedParents.size() > 1 && (loadedParents.get(0).isChildOf(loadedParents.get(1)) || loadedParents.get(1).isChildOf(loadedParents.get(0))))
+		if(loadedParents.size() > 1 && (loadedParents.get(0).isChildOf(loadedParents.get(1)) || loadedParents.get(1).isChildOf(loadedParents.get(0)))) {
+			processingTransactions.remove(tx.getUid());
 			return;
+		}
 
-		
+		//Make a list of all input we are child of
+		ArrayList<LoadedTransaction> childOfInputs = new ArrayList<LoadedTransaction>();
+		for(LoadedTransaction parent : loadedParents)
+			for(LoadedTransaction input : loadedInputs)
+			if(parent.isChildOf(input))
+				childOfInputs.add(input);
+			
 		long totalInputValue = 0;
 		
 		//check if inputs are valid and calculate inputs total value
 		for(LoadedTransaction input : loadedInputs) {
+			//check if transaction is child of its input
+			if(!childOfInputs.contains(input)) {
+				processingTransactions.remove(tx.getUid());
+				return;
+			}
+			
 			if(!input.getOutputsMap().containsKey(tx.getAddress())) {
 				processingTransactions.remove(tx.getUid());
 				return;
@@ -269,14 +472,13 @@ public class DAG {
 				processingTransactions.remove(tx.getUid());
 				return;
 			}
-				
 			
 			long amount = input.getOutputsMap().get(tx.getAddress()).getAmount();
 			totalInputValue += amount;
 		}
 		
 		//Check if inputs contains enough funds to cover outputs
-		if(totalInputValue < tx.getOutputsValue()) {
+		if(totalInputValue != tx.getOutputsValue()) {
 			processingTransactions.remove(tx.getUid());
 			throw new IllegalArgumentException("Trying to spend more than allowed ("+tx.getOutputsValue()+" / " + totalInputValue +")");
 		}
@@ -293,7 +495,7 @@ public class DAG {
 		//remove transaction from processing ones
 		processingTransactions.remove(tx.getUid());
 		
-		//try to load any tranasaction that was waiting for this one to load
+		//try to load any transaction that was waiting for this one to load
 		removeWaitedTx(loadedTx.getUid());		
 		
 	}
@@ -381,6 +583,38 @@ public class DAG {
 		return bestParents;
 	}
 
+	public LoadedTransaction getBestTipBeacon() {
+		LoadedTransaction selectedBeacon = null;
+		
+		for(LoadedTransaction beacon : childLessBeacons) {
+			if(selectedBeacon == null) {
+				selectedBeacon = beacon;
+				continue;
+			}
+			
+			if(selectedBeacon.getWeight() < beacon.getWeight()) {
+				selectedBeacon = beacon;
+				continue;
+			}
+			
+			if(selectedBeacon.getWeight() == beacon.getWeight()) {
+				if(selectedBeacon.getBeaconHeight() < beacon.getBeaconHeight()) {
+					selectedBeacon = beacon;
+					continue;
+				}
+				
+				if(selectedBeacon.getBeaconHeight() == beacon.getBeaconHeight()) {
+					if(selectedBeacon.getDate() > beacon.getDate()) {
+						selectedBeacon = beacon;
+						continue;
+					}
+				}
+			}
+		}
+		
+		return selectedBeacon;
+	}
+	
 	/**
 	 * @param uid A transaction id
 	 * @return true if the transaction is loaded or is present in database, false otherwise
@@ -437,10 +671,6 @@ public class DAG {
 		return loadedTransactions.containsKey(txUid);
 	}
 
-	public long getMainChainLength() {
-		return mainChain.size();
-	}
-
 	public long loadedTxsCount() {
 		return loadedTransactions.size();
 	}
@@ -450,6 +680,16 @@ public class DAG {
 		return waitingTxsUids.size();
 	}
 
+	public LoadedTransaction getGenesis() {
+		return genesis;
+	}
+	
+	public static long calcDifficulty(long lastDiff, long solveTime, long blockNumber) {
+		
+		return lastDiff + lastDiff / 2048 * Math.max(1 - solveTime / 10, -99) + (long)(Math.pow(2d, (blockNumber / 100) - 2));
+		
+	}
+	
 	public ArrayList<String> getTipsUids() {
 		ArrayList<String> uids = new ArrayList<String>();
 		

@@ -39,7 +39,7 @@ public class Miscellaneous {
 	}
 	
 	public static boolean validateAmount(long amount) {
-		if(amount <= 0 || amount > Main.TOTALUNITS)
+		if(amount <= 0)
 			return false;
 		
 		return true;
