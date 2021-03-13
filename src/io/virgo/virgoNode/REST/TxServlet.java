@@ -57,6 +57,7 @@ public class TxServlet {
 						JSONObject txState = new JSONObject();
 						
 						txState.put("status", tx.getStatus().ordinal());
+						txState.put("confirmations", tx.confirmationCount());
 						
 						JSONArray txOutputs = new JSONArray();
 						

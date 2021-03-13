@@ -7,6 +7,7 @@ import org.json.JSONObject;
 
 import io.virgo.geoWeb.Peer;
 import io.virgo.virgoCryptoLib.Converter;
+import io.virgo.virgoCryptoLib.Sha256;
 import io.virgo.virgoNode.Main;
 
 public class OnTxs {
@@ -20,7 +21,18 @@ public class OnTxs {
 			
 			JSONObject txJson = txs.getJSONObject(i);
 		
-			String txUid = Converter.Addressify(Converter.hexToBytes(txJson.getString("sig")), Main.TX_IDENTIFIER);
+			String txUid;
+			
+			if(txJson.has("parentBeacon")) {
+				txUid = Converter.Addressify(Sha256.getDoubleHash((txJson.getJSONArray("parents").toString()
+						+ txJson.getJSONArray("outputs").toString()
+						+ txJson.getString("parentBeacon")
+						+ txJson.getLong("date")
+						+ txJson.getLong("nonce")).getBytes()).toBytes(), Main.TX_IDENTIFIER);
+			}else {
+				txUid = Converter.Addressify(Converter.hexToBytes(txJson.getString("sig")), Main.TX_IDENTIFIER);
+			}
+			
 			
 			if(Main.getDAG().hasTransaction(txUid))
 				continue;
@@ -39,6 +51,7 @@ public class OnTxs {
 				transactionsToBroadcast.put(txUid);
 				
 			}catch(IllegalArgumentException e) {
+				e.printStackTrace();
 				if(messageJson.has("callback")) {
 					JSONObject txCallback = new JSONObject();	
 					txCallback.put("command", "txCallback");

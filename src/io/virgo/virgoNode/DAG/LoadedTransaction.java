@@ -113,7 +113,7 @@ public class LoadedTransaction extends Transaction {
 		Branch branch = new Branch();
 		branch.addTx(this);
 		
-		difficulty = 100000;
+		difficulty = 5000000;
 		mainChainMember = true;
 		dag.childLessBeacons.add(this);
 		
@@ -200,6 +200,7 @@ public class LoadedTransaction extends Transaction {
 		
 		}
 		
+		
 		chooseNextBeacon();
 	}
 	
@@ -236,6 +237,9 @@ public class LoadedTransaction extends Transaction {
 		
 		if(!confirmedParents)
 			confirmParents();
+		
+		if(loadedChildBeacons.size() == 0)
+			return;
 		
 		if(loadedChildBeacons.size() == 1) {
 			loadedChildBeacons.get(0).mainChainMember = true;
@@ -331,6 +335,7 @@ public class LoadedTransaction extends Transaction {
 		for(TxOutput input : loadedInputs)
 			if(input.claimers.size() > 1) {
 				settlingTransaction.conflictualTxs.add(this);
+				canConfirm = false;
 				break;
 			}
 				
@@ -425,6 +430,7 @@ public class LoadedTransaction extends Transaction {
 	}
 	
 	public void save() {
+		System.out.println("saving " + getUid());
 		dag.writer.push(this);
 	}
 	

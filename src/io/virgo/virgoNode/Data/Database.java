@@ -44,15 +44,19 @@ public class Database {
 		PreparedStatement insertStmt = conn.prepareStatement("INSERT OR IGNORE INTO txs (id, sig, pubKey, parents, inputs, outputs, parentBeacon, nonce, date) VALUES (?,?,?,?,?,?,?,?,?)");
     	
     	insertStmt.setString(1, tx.getUid());
-    	insertStmt.setBytes(2, tx.getSignature().toByteArray());
-    	insertStmt.setBytes(3, tx.getPublicKey());
     	insertStmt.setString(4,  new JSONArray(tx.getParentsUids()).toString());
     	
     	
-    	if(tx.getParentBeaconUid() != null)
+    	if(tx.getParentBeaconUid() == null) {
+        	insertStmt.setBytes(2, tx.getSignature().toByteArray());
+        	insertStmt.setBytes(3, tx.getPublicKey());
     		insertStmt.setString(5,  new JSONArray(tx.getInputsUids()).toString());
-    	else
+    	} else {
+    		insertStmt.setBytes(2, null);
+    		insertStmt.setBytes(3, null);
     		insertStmt.setString(5, null);
+    	}
+    		
     		
 		JSONArray outputsJson = new JSONArray();
 		for(Map.Entry<String, TxOutput> entry : tx.getOutputsMap().entrySet())
@@ -77,15 +81,15 @@ public class Database {
         if(result.next()) {
         	JSONObject txJson = new JSONObject();
         	
-    		txJson.put("sig", Converter.bytesToHex(result.getBytes("sig")));
-    		txJson.put("pubKey", Converter.bytesToHex(result.getBytes("pubKey")));
     		txJson.put("parents", new JSONArray(result.getString("parents")));
     		
     		String parentBeacon = result.getString("parentBeacon");
     		
-    		if(parentBeacon == null)
+    		if(parentBeacon == null) {
+        		txJson.put("sig", Converter.bytesToHex(result.getBytes("sig")));
+        		txJson.put("pubKey", Converter.bytesToHex(result.getBytes("pubKey")));
     			txJson.put("inputs", new JSONArray(result.getString("inputs")));
-    		else {
+    		} else {
     			txJson.put("parentBeacon", parentBeacon);
     			txJson.put("nonce", result.getLong("nonce"));
     		}

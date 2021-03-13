@@ -14,13 +14,13 @@ public class TxOutput {
 	private long amount;
 	public ArrayList<LoadedTransaction> claimers = new ArrayList<LoadedTransaction>();
 	
-	public TxOutput(String address, long amount, String originTx, String originAddress) {
+	public TxOutput(String address, long amount, String originTx) {
 		this.address = address;
 		this.amount = amount;
 		this.originTx = originTx;
 	}
 	
-	public TxOutput(String address, long amount, String originTx, String originAddress, String claimedBy) {
+	public TxOutput(String address, long amount, String originTx, String claimedBy) {
 		this.address = address;
 		this.amount = amount;
 		this.originTx = originTx;
@@ -35,18 +35,18 @@ public class TxOutput {
 	 * @throws ArithmeticException Given amount is out of range
 	 * @throws IllegalArgumentException Can't build a TxOutput from this string
 	 */
-	public static TxOutput fromString(String inputString, String originTx, String originAddress) throws ArithmeticException, IllegalArgumentException {
+	public static TxOutput fromString(String inputString, String originTx) throws ArithmeticException, IllegalArgumentException {
 		
 		String[] outArgs = inputString.split(",");
 		
 		switch(outArgs.length) {
 		case 2:
 			if(Miscellaneous.validateAddress(outArgs[0], Main.ADDR_IDENTIFIER))
-				return new TxOutput(outArgs[0], Converter.hexToDec(outArgs[1]).longValueExact(), originTx, originAddress);
+				return new TxOutput(outArgs[0], Converter.hexToDec(outArgs[1]).longValueExact(), originTx);
 			break;
 		case 3:
 			if(Miscellaneous.validateAddress(outArgs[0], Main.ADDR_IDENTIFIER) && Miscellaneous.validateAddress(outArgs[2], Main.TX_IDENTIFIER))
-				return new TxOutput(outArgs[0], Converter.hexToDec(outArgs[1]).longValueExact(), originTx, originAddress, outArgs[3]);
+				return new TxOutput(outArgs[0], Converter.hexToDec(outArgs[1]).longValueExact(), originTx, outArgs[3]);
 		}
 		
 		throw new IllegalArgumentException("Can't build a TxOutput from this string.");

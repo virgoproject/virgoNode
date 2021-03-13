@@ -17,8 +17,8 @@ public class Transaction {
 	
 	private String uid;
 	private String address;
-	private ECDSASignature signature;
-	private byte[] pubKey;
+	private ECDSASignature signature = null;
+	private byte[] pubKey = null;
 	
 	private boolean isGenesis = false;
 	
@@ -64,13 +64,13 @@ public class Transaction {
 		
 	}
 	
-	public Transaction(byte[] pubKey, ECDSASignature signature, String[] parentsUid, TxOutput[] outputs, String parentBeaconUid, long nonce, long date, boolean isSaved) {
+	public Transaction(String uid, String[] parentsUid, TxOutput[] outputs, String parentBeaconUid, long nonce, long date, boolean isSaved) {
 		
-		uid = Converter.Addressify(signature.toByteArray(), Main.TX_IDENTIFIER);
-		address = Converter.Addressify(pubKey, Main.ADDR_IDENTIFIER);
+		this.uid = uid;
+		address = outputs[0].getAddress();
 		
-		this.pubKey = pubKey;
-		this.signature = signature;
+		this.pubKey = null;
+		this.signature = null;
 		this.parentsUid = parentsUid;
 		this.isSaved = isSaved;
 		
@@ -83,8 +83,6 @@ public class Transaction {
 		
 		for(TxOutput out : outputs) {
 			this.outputs.put(out.getAddress(), out);
-			
-				
 			outputsValue += out.getAmount();
 		}
 		
@@ -197,13 +195,13 @@ public class Transaction {
 	 */
 	public JSONObject toJSONObject() {
 		JSONObject txJson = new JSONObject();
-		txJson.put("sig", getSignature().toHexString());
-		txJson.put("pubKey", Converter.bytesToHex(getPublicKey()));
 		txJson.put("parents", new JSONArray(getParentsUids()));
 		
-		if(!isBeaconTransaction())
+		if(!isBeaconTransaction()) {
+			txJson.put("sig", getSignature().toHexString());
+			txJson.put("pubKey", Converter.bytesToHex(getPublicKey()));
 			txJson.put("inputs", new JSONArray(getInputsUids()));
-		else {
+		} else {
 			txJson.put("parentBeacon", getParentBeaconUid());
 			txJson.put("nonce", getNonce());
 		}

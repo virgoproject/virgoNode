@@ -141,50 +141,62 @@ public class DAG {
 	
 	
 	public void initTx(JSONObject txJson, boolean saved) throws JSONException, IllegalArgumentException {
-		
-		byte[] sigBytes = Converter.hexToBytes(txJson.getString("sig"));
-		byte[] pubKey = Converter.hexToBytes(txJson.getString("pubKey"));
+
 		JSONArray parents = txJson.getJSONArray("parents");
 		JSONArray outputs = txJson.getJSONArray("outputs");
 		long date = txJson.getLong("date");
 		
-		String txUid = Converter.Addressify(sigBytes, Main.TX_IDENTIFIER);
-		
-		//Ensure transaction isn't processed yet
-		if(loadedTransactions.containsKey(txUid) || waitingTxsUids.contains(txUid))
-			return;
-		
-		//prevent concurrency with synchronized list of processing transactions
-		synchronized(processingTransactions) {
-			if(processingTransactions.contains(txUid))
-				return;
-			else
-				processingTransactions.add(txUid);
-		}
-		
 		//transaction is a beacon transaction
 		if(txJson.has("parentBeacon")) {
-		
+			
 			String parentBeacon = txJson.getString("parentBeacon");
 			long nonce = txJson.getLong("nonce");
 		
-			initBeaconTx(sigBytes, pubKey, parents, outputs, parentBeacon, nonce, date, saved);
+			String txUid = Converter.Addressify(Sha256.getDoubleHash((parents.toString() + outputs.toString() + parentBeacon + date + nonce).getBytes()).toBytes(), Main.TX_IDENTIFIER);
+			System.out.println("loading beacontx " + txUid);
+			//Ensure transaction isn't processed yet
+			if(loadedTransactions.containsKey(txUid) || waitingTxsUids.contains(txUid))
+				return;
+			
+			//prevent concurrency with synchronized list of processing transactions
+			synchronized(processingTransactions) {
+				if(processingTransactions.contains(txUid))
+					return;
+				else
+					processingTransactions.add(txUid);
+			}
+			
+			initBeaconTx(parents, outputs, parentBeacon, nonce, date, saved);
 			
 		//regular transaction
 		}else {
+			byte[] sigBytes = Converter.hexToBytes(txJson.getString("sig"));
+			byte[] pubKey = Converter.hexToBytes(txJson.getString("pubKey"));
 			JSONArray inputs = txJson.getJSONArray("inputs");
+			
+			String txUid = Converter.Addressify(sigBytes, Main.TX_IDENTIFIER);
+			System.out.println("loading tx " + txUid);
+			//Ensure transaction isn't processed yet
+			if(loadedTransactions.containsKey(txUid) || waitingTxsUids.contains(txUid))
+				return;
+			
+			//prevent concurrency with synchronized list of processing transactions
+			synchronized(processingTransactions) {
+				if(processingTransactions.contains(txUid))
+					return;
+				else
+					processingTransactions.add(txUid);
+			}
 			
 			initTx(sigBytes, pubKey, parents, inputs, outputs, date, saved);
 		}
 			
-		
-		
 	}
 	
-	public void initBeaconTx(byte[] sigBytes, byte[] pubKey, JSONArray parents, JSONArray outputs, String parentBeacon, long nonce, long date, boolean saved) {
+	public void initBeaconTx(JSONArray parents, JSONArray outputs, String parentBeacon, long nonce, long date, boolean saved) {
 		
-		String txUid = Converter.Addressify(sigBytes, Main.TX_IDENTIFIER);
-		String address = Converter.Addressify(pubKey, Main.ADDR_IDENTIFIER);
+		Sha256Hash txHash = Sha256.getDoubleHash((parents.toString() + outputs.toString() + parentBeacon + date + nonce).getBytes());
+		String txUid = Converter.Addressify(txHash.toBytes(), Main.TX_IDENTIFIER);
 		
 		JSONArray[] cleanedTx = cleanTx(parents, new JSONArray(), outputs);
 		parents = cleanedTx[0];
@@ -201,21 +213,6 @@ public class DAG {
 			throw new IllegalArgumentException("Invalid transaction format");
 		}
 		
-		Sha256Hash txHash = Sha256.getDoubleHash((parents.toString() + outputs.toString() + parentBeacon + date + nonce).getBytes());
-		
-		//check if signature is valid, bypass this check if transaction is coming from disk		
-		if(!saved) {
-		
-			ECDSA signer = new ECDSA();
-			ECDSASignature sig = ECDSASignature.fromByteArray(sigBytes);
-			
-			if(!signer.Verify(txHash, sig, pubKey)) {
-				processingTransactions.remove(txUid);
-				throw new IllegalArgumentException("Invalid signature");
-			}
-			
-		}
-		
 		//Convert parents JSON to string array
 		ArrayList<String> parentsUids = new ArrayList<String>();
 		for(int i = 0; i < parents.length(); i++)
@@ -224,7 +221,7 @@ public class DAG {
 		//Build TxOutput objects for this transaction
 		ArrayList<TxOutput> constructedOutput = new ArrayList<TxOutput>();
 		
-		TxOutput output = TxOutput.fromString(outputs.getString(0), txUid, address);
+		TxOutput output = TxOutput.fromString(outputs.getString(0), txUid);
 		constructedOutput.add(output);
 		
 		if(output.getAmount() != Main.BEACON_REWARD) {
@@ -233,7 +230,7 @@ public class DAG {
 		}
 		
 		//Create corresponding Transaction object
-		Transaction tx = new Transaction(pubKey, ECDSASignature.fromByteArray(sigBytes),
+		Transaction tx = new Transaction(txUid,
 				parentsUids.toArray(new String[parentsUids.size()]),
 				constructedOutput.toArray(new TxOutput[1]),
 				parentBeacon, nonce, date, saved);
@@ -328,6 +325,7 @@ public class DAG {
 		LoadedTransaction loadedTx = new LoadedTransaction(this, tx, loadedParents.toArray(new LoadedTransaction[loadedParents.size()]), parentBeacon);
 		loadedTransactions.put(loadedTx.getUid(), loadedTx);
 		
+		System.out.println("saving1 " + tx.getUid());
 		//save transaction if not done yet
 		if(!loadedTx.isSaved())
 			loadedTx.save();
@@ -347,7 +345,6 @@ public class DAG {
 	public void initTx(byte[] sigBytes, byte[] pubKey, JSONArray parents, JSONArray inputs, JSONArray outputs, long date, boolean saved) throws IllegalArgumentException {
 		
 		String txUid = Converter.Addressify(sigBytes, Main.TX_IDENTIFIER);
-		String address = Converter.Addressify(pubKey, Main.ADDR_IDENTIFIER);
 		
 		//Remove any useless data from transaction, if there is then transaction will be refused
 		JSONArray[] cleanedTx = cleanTx(parents, inputs, outputs);
@@ -389,7 +386,7 @@ public class DAG {
 		ArrayList<TxOutput> constructedOutputs = new ArrayList<TxOutput>();
 		
 		for(int i = 0; i < outputs.length(); i++) {
-			TxOutput output = TxOutput.fromString(outputs.getString(i), txUid, address);
+			TxOutput output = TxOutput.fromString(outputs.getString(i), txUid);
 			constructedOutputs.add(output);
 		}
 		
@@ -439,7 +436,7 @@ public class DAG {
 			processingTransactions.remove(tx.getUid());
 			return;
 		}
-		
+
 		//check if transaction has no useless parent
 		if(loadedParents.size() > 1 && (loadedParents.get(0).isChildOf(loadedParents.get(1)) || loadedParents.get(1).isChildOf(loadedParents.get(0)))) {
 			processingTransactions.remove(tx.getUid());
@@ -530,7 +527,7 @@ public class DAG {
 		
 		for(int i = 0; i < outputs.length(); i++) {
 			try {
-				TxOutput output = TxOutput.fromString(outputs.getString(i), "", "");				
+				TxOutput output = TxOutput.fromString(outputs.getString(i), "");				
 				cleanedOutputs.put(output.toString());
 			}catch(JSONException | ArithmeticException | IllegalArgumentException e) {}
 		}
@@ -686,7 +683,7 @@ public class DAG {
 	
 	public static long calcDifficulty(long lastDiff, long solveTime, long blockNumber) {
 		
-		return lastDiff + lastDiff / 2048 * Math.max(1 - solveTime / 10, -99) + (long)(Math.pow(2d, (blockNumber / 100) - 2));
+		return lastDiff + lastDiff / 2048 * Math.max(1 - solveTime / 60, -99) + (long)(Math.pow(2d, (blockNumber / 100) - 2));
 		
 	}
 	
