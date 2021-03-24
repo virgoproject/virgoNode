@@ -25,13 +25,10 @@ public class OnGetAddrTxs {
 			
 			if(Main.getDAG().infos.hasAddressInfos(address)) {
 				AddressInfos addrInfos = Main.getDAG().infos.getAddressInfos(address);
-				
-				txs.put("inputs", new JSONArray(addrInfos.getInputTxs()));
-				txs.put("outputs", new JSONArray(addrInfos.getOutputTxs()));
-			} else {
-				txs.put("inputs", new JSONArray());
-				txs.put("outputs", new JSONArray());
-			}
+				txs.put("txs", new JSONArray(addrInfos.getTransactions()));
+			} else
+				txs.put("txs", new JSONArray());
+			
 			
 			addrTxs.put(txs);
 		}

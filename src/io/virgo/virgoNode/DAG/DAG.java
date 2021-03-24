@@ -1,6 +1,7 @@
 package io.virgo.virgoNode.DAG;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -17,6 +18,8 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import io.virgo.randomX.RandomX;
+import io.virgo.randomX.RandomX_VM;
 import io.virgo.virgoCryptoLib.Converter;
 import io.virgo.virgoCryptoLib.ECDSA;
 import io.virgo.virgoCryptoLib.ECDSASignature;
@@ -55,9 +58,13 @@ public class DAG {
 	
 	final public DAGInfos infos = new DAGInfos();
 	
+	private String currentVmKey;
+	private RandomX randomX;
+	private RandomX_VM randomX_vm;
+	
 	public DAG(int saveInterval) throws IOException {
 		this.saveInterval = saveInterval;
-	
+		
 		//start event listener thread
 		eventListener = new EventListener(this);
 		(new Thread(eventListener)).start();
@@ -69,6 +76,13 @@ public class DAG {
 		genesis = new LoadedTransaction(this, genesisOutputs);
 		loadedTransactions.put(genesis.getUid(), genesis);
 		childLessTxs.add(genesis);
+		
+		randomX = new RandomX.Builder().build();
+		
+		randomX.init(genesis.getRandomXKey().getBytes());
+		randomX_vm = randomX.createVM();
+		
+		currentVmKey = genesis.getRandomXKey();
 		
 		System.out.println("Genesis TxUid is " + genesis.getUid());
 		
@@ -96,7 +110,7 @@ public class DAG {
 				} catch (InterruptedException e) {}
 				
 				if(waitedTxs.size() != 0) {
-					Collection<String> lakingTransactions = waitedTxs.keySet();
+					Collection<String> lakingTransactions = new ArrayList<String>(waitedTxs.keySet());
 					lakingTransactions.removeAll(waitingTxsUids);
 					Peers.askTxs(lakingTransactions);
 				}
@@ -153,7 +167,6 @@ public class DAG {
 			long nonce = txJson.getLong("nonce");
 		
 			String txUid = Converter.Addressify(Sha256.getDoubleHash((parents.toString() + outputs.toString() + parentBeacon + date + nonce).getBytes()).toBytes(), Main.TX_IDENTIFIER);
-			System.out.println("loading beacontx " + txUid);
 			//Ensure transaction isn't processed yet
 			if(loadedTransactions.containsKey(txUid) || waitingTxsUids.contains(txUid))
 				return;
@@ -175,7 +188,6 @@ public class DAG {
 			JSONArray inputs = txJson.getJSONArray("inputs");
 			
 			String txUid = Converter.Addressify(sigBytes, Main.TX_IDENTIFIER);
-			System.out.println("loading tx " + txUid);
 			//Ensure transaction isn't processed yet
 			if(loadedTransactions.containsKey(txUid) || waitingTxsUids.contains(txUid))
 				return;
@@ -269,6 +281,7 @@ public class DAG {
 		//check if transaction has no useless parent
 		if(loadedParents.size() > 1 && (loadedParents.get(0).isChildOf(loadedParents.get(1)) || loadedParents.get(1).isChildOf(loadedParents.get(0)))) {
 			processingTransactions.remove(tx.getUid());
+			System.out.println("2 " + tx.getUid() + " " + loadedParents.get(0).getUid() + " " + loadedParents.get(1).getUid());
 			return;
 		}
 		
@@ -290,24 +303,31 @@ public class DAG {
 		
 		if(tx.getDate() < medianTime || tx.getDate() > System.currentTimeMillis()+900000) {
 			processingTransactions.remove(tx.getUid());
+			System.out.println("3");
 			return;
 		}
 		
 		//check if transaction is effectively child of it's parent beacon
 		boolean childOf = false;
 		for(LoadedTransaction parent : loadedParents)
-			if(parent.isChildOf(parentBeacon)) {
+			if(parent.isChildOf(parentBeacon) || parent.equals(parentBeacon)) {
 				childOf = true;
 				break;
 			}
 				
 		if(!childOf) {
 			processingTransactions.remove(tx.getUid());
+			System.out.println("4");
 			return;
 		}
 		
+		if(!parentBeacon.getRandomXKey().equals(currentVmKey)) {
+			randomX.changeKey(parentBeacon.getRandomXKey().getBytes());
+			currentVmKey = genesis.getRandomXKey();
+		}
+		
 		JSONObject txJson = tx.toJSONObject();
-		Sha256Hash txHash = Sha256.getDoubleHash((
+		byte[] txHash = randomX_vm.getHash((
 				txJson.getJSONArray("parents").toString()
 				+ txJson.getJSONArray("outputs").toString()
 				+ parentBeacon.getUid()
@@ -315,9 +335,17 @@ public class DAG {
 				+ tx.getNonce()
 				).getBytes());
 		
+		byte[] hashPadded = new byte[txHash.length + 1];
+		for (int i = 0; i < txHash.length; i++) {
+			hashPadded[i + 1] = txHash[i];
+		}
+		
+		long hashValue = ByteBuffer.wrap(hashPadded).getLong();
+		
 		//check if required difficulty is met
-		if(txHash.toLong() >= Main.MAX_DIFFICULTY/parentBeacon.getDifficulty()) {
+		if(hashValue >= Main.MAX_DIFFICULTY/parentBeacon.getDifficulty()) {
 			processingTransactions.remove(tx.getUid());
+			System.out.println("5");
 			return;
 		}
 		
@@ -325,7 +353,6 @@ public class DAG {
 		LoadedTransaction loadedTx = new LoadedTransaction(this, tx, loadedParents.toArray(new LoadedTransaction[loadedParents.size()]), parentBeacon);
 		loadedTransactions.put(loadedTx.getUid(), loadedTx);
 		
-		System.out.println("saving1 " + tx.getUid());
 		//save transaction if not done yet
 		if(!loadedTx.isSaved())
 			loadedTx.save();
@@ -681,9 +708,22 @@ public class DAG {
 		return genesis;
 	}
 	
-	public static long calcDifficulty(long lastDiff, long solveTime, long blockNumber) {
+	public static long calcDifficulty(ArrayList<Long> targets, ArrayList<Long> solveTimes) {
 		
-		return lastDiff + lastDiff / 2048 * Math.max(1 - solveTime / 60, -99) + (long)(Math.pow(2d, (blockNumber / 100) - 2));
+		int T = 60;
+		int N = 22;
+
+		long sumD = 0;
+		double sumST = 0;
+		
+		for (long solveTime : solveTimes) { 
+		   sumD += targets.get(solveTimes.indexOf(solveTime)); 
+		   if (solveTime > 7*T) {solveTime = 7*T; }
+		   if (solveTime < -6*T) {solveTime = -6*T; }
+		   sumST += solveTime;
+		}
+		sumST = 0.75*N*T + 0.2523*sumST;
+		return (long) (sumD * T / sumST);
 		
 	}
 	

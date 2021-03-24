@@ -42,6 +42,10 @@ public class LoadedTransaction extends Transaction {
 	private boolean mainChainMember = false;
 	private boolean confirmedParents = false;
 	private ArrayList<LoadedTransaction> conflictualTxs = new ArrayList<LoadedTransaction>();
+	private ArrayList<Long> solveTimes = new ArrayList<Long>();//solveTimes of the last 22 parent blocks
+	private ArrayList<Long> difficulties = new ArrayList<Long>();//difficulties of the last 22 parent blocks
+	private String randomX_key = null;
+	private String practical_randomX_key = null;
 	
 	private LoadedTransaction settlingTransaction;
 	
@@ -95,8 +99,6 @@ public class LoadedTransaction extends Transaction {
 		
 		setupBranch();
 		
-		
-		
 		dag.getEventListener().notify(new TransactionLoadedEvent(this));
 	}
 	
@@ -113,9 +115,18 @@ public class LoadedTransaction extends Transaction {
 		Branch branch = new Branch();
 		branch.addTx(this);
 		
-		difficulty = 5000000;
+		difficulty = 10000;
 		mainChainMember = true;
+		confirmedParents = true;
 		dag.childLessBeacons.add(this);
+		
+		randomX_key = getUid();
+		practical_randomX_key = getUid();
+		
+		for(int i = 0; i < 22; i++) {
+			difficulties.add(difficulty);
+			solveTimes.add(60l);
+		}
 		
 		settlingTransaction = this;
 		
@@ -144,7 +155,33 @@ public class LoadedTransaction extends Transaction {
 		dag.childLessBeacons.remove(loadedParentBeacon);
 		dag.childLessBeacons.add(this);
 		
-		difficulty = DAG.calcDifficulty(loadedParentBeacon.getDifficulty(), getDate()-loadedParentBeacon.getDate(), beaconHeight);
+		difficulty = DAG.calcDifficulty(loadedParentBeacon.difficulties, loadedParentBeacon.solveTimes);
+		
+		
+		difficulties = loadedParentBeacon.difficulties;
+		solveTimes = loadedParentBeacon.solveTimes;
+		
+		if(difficulties.size() == 22)
+			difficulties.remove(0);
+		difficulties.add(difficulty);
+		
+		if(solveTimes.size() == 22)
+			solveTimes.remove(0);
+		solveTimes.add((getDate()-loadedParentBeacon.getDate())/1000);
+		
+		if(beaconHeight % 2048 == 0)
+			randomX_key = getUid();
+		else
+			randomX_key = parentBeacon.randomX_key;
+		
+		LoadedTransaction beacon64old = this;
+		for(int i = 0; i < 64; i++) {
+			if(beacon64old.isGenesis())
+				break;
+			beacon64old = beacon64old.getParentBeacon();
+		}
+		
+		practical_randomX_key = beacon64old.randomX_key;
 		
 		//Add this transaction to tips list
 		dag.childLessTxs.add(this);
@@ -177,6 +214,7 @@ public class LoadedTransaction extends Transaction {
 				if(parent.getHeight() > height)
 					height = parent.getHeight() + 1;
 		
+		setupBranch();
 		setupBeaconBranch();
 		
 		dag.getEventListener().notify(new TransactionLoadedEvent(this));
@@ -232,8 +270,10 @@ public class LoadedTransaction extends Transaction {
 	}
 	
 	private void chooseNextBeacon() {
-		if(!mainChainMember)
+		if(!mainChainMember) {
 			loadedParentBeacon.chooseNextBeacon();
+			return;
+		}
 		
 		if(!confirmedParents)
 			confirmParents();
@@ -266,6 +306,10 @@ public class LoadedTransaction extends Transaction {
 					if(mainChainBeaconChild != childBeacon && childBeacon.getWeight() == mainChainBeaconChild.getWeight())
 						return;
 				
+				for(LoadedTransaction childBeacon : loadedChildBeacons)
+					if(childBeacon != mainChainBeaconChild)
+						childBeacon.rejectTx();
+				
 				mainChainBeaconChild.mainChainMember = true;
 				mainChainBeaconChild.chooseNextBeacon();
 				
@@ -287,6 +331,10 @@ public class LoadedTransaction extends Transaction {
 					biggestChild.mainChainMember = true;
 					biggestChild.chooseNextBeacon();
 				}
+				
+				for(LoadedTransaction childBeacon : loadedChildBeacons)
+					if(childBeacon != biggestChild)
+						childBeacon.rejectTx();
 			}
 			
 		}
@@ -295,6 +343,7 @@ public class LoadedTransaction extends Transaction {
 	
 	private void confirmParents() {
 		confirmedParents = true;
+		confirmTx();
 		
 		for(LoadedTransaction parent : loadedParents)
 			parent.setSettler(this);
@@ -350,6 +399,7 @@ public class LoadedTransaction extends Transaction {
 		if(!mainChainMember)
 			return;
 		
+		changeStatus(TxStatus.PENDING);
 		mainChainMember = false;
 		confirmedParents = false;
 		conflictualTxs.clear();
@@ -391,16 +441,40 @@ public class LoadedTransaction extends Transaction {
 	 */
 	public boolean isChildOf(LoadedTransaction target) {
 		
+		boolean result = false;
+		
 		for(Branch branch : target.partOf.keySet())
 			if(partOf.containsKey(branch)) {
 				if(partOf.get(branch) < target.partOf.get(branch))
-					return false;
+					result=  false;
 				
-			} else return false;
+			} else result=  false;
 			
 		
-		return true;
+		result= true;
 
+		
+		boolean trueResult = hardIsChildOf(target);
+		
+		return trueResult;
+	}
+	
+	public boolean hardIsChildOf(LoadedTransaction target) {
+		
+		if(isGenesis())
+			return false;
+		
+		if(loadedParents.contains(target))
+			return true;
+		
+		for(LoadedTransaction parent : loadedParents) {
+			if(parent.hardIsChildOf(target))
+				return true;
+		}
+
+
+		return false;
+		
 	}
 	
 	public void addChild(LoadedTransaction child) {
@@ -427,6 +501,9 @@ public class LoadedTransaction extends Transaction {
 			for(LoadedTransaction claimer : out.claimers)
 				claimer.rejectTx();
 		
+		if(isBeaconTransaction())
+			for(LoadedTransaction childBeacon : loadedChildBeacons)
+				childBeacon.rejectTx();
 	}
 	
 	public void save() {
@@ -482,6 +559,10 @@ public class LoadedTransaction extends Transaction {
 		return beaconHeight;
 	}
 	
+	public boolean isMainChainMember() {
+		return mainChainMember;
+	}
+	
 	public int confirmationCount() {
 		if(settlingTransaction == null)
 			return 0;
@@ -499,8 +580,16 @@ public class LoadedTransaction extends Transaction {
 		return confirmations;
 	}
 
+	public LoadedTransaction getSettlingTransaction() {
+		return settlingTransaction;
+	}
+	
 	public long getDifficulty() {
 		return difficulty;
+	}
+	
+	public String getRandomXKey() {
+		return practical_randomX_key;
 	}
 	
 }

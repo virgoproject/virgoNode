@@ -44,10 +44,16 @@ public class Server {
 	        			response = TipsServlet.GET();
 	        			break;
 	        		
-	        		
+	        		case "work":
+	        			response = WorkServlet.GET();
+	        			break;
+	        			
+	        		case "beacon":
+	        			response = WorkServlet.GET();
+	        			break;
 	        			
         		}
-        		
+            	exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
                 exchange.sendResponseHeaders(response.getResponseCode(), response.getResponseBodyBytes().length);
                 OutputStream output = exchange.getResponseBody();
                 output.write(response.getResponseBodyBytes());

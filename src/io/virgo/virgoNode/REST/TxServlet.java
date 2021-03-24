@@ -25,7 +25,6 @@ public class TxServlet {
 					return new Response(200, Main.getDAG().getTxJSON(arguments[0]).toString());
 				else {
 					JSONObject resp = new JSONObject();
-					resp.put("tx", arguments[0]);
 					resp.put("notFound", true);
 					
 					return new Response(404, resp.toString());
@@ -58,6 +57,7 @@ public class TxServlet {
 						
 						txState.put("status", tx.getStatus().ordinal());
 						txState.put("confirmations", tx.confirmationCount());
+						txState.put("beacon", tx.getSettlingTransaction().getUid());
 						
 						JSONArray txOutputs = new JSONArray();
 						
@@ -66,7 +66,7 @@ public class TxServlet {
 							
 							outputState.put("address", out.getAddress());
 							outputState.put("amount", out.getAmount());
-							outputState.put("state", out.isSpent());
+							outputState.put("spent", out.isSpent());
 							
 							txOutputs.put(outputState);
 						}
@@ -77,7 +77,6 @@ public class TxServlet {
 						
 					} else {
 						JSONObject resp = new JSONObject();
-						resp.put("tx", arguments[0]);
 						resp.put("notFound", true);
 						
 						return new Response(404, resp.toString());
@@ -88,7 +87,7 @@ public class TxServlet {
 				}
 				
 			}
-		
+			
 		default: return new Response(405, "");
 		
 		}		

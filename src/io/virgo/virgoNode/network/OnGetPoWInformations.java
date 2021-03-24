@@ -16,6 +16,7 @@ public class OnGetPoWInformations {
 		resp.put("command", "PoWInformations");
 		resp.put("parentBeacon", bestParentBeacon.getUid());
 		resp.put("difficulty", bestParentBeacon.getDifficulty());
+		resp.put("key", bestParentBeacon.getRandomXKey());
 		
 		JSONArray parentTxs = new JSONArray();
 		for(String parent : Main.getDAG().getBestParents())

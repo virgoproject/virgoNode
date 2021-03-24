@@ -9,8 +9,7 @@ import io.virgo.virgoNode.DAG.TxStatus;
 public class AddressInfos {
 
 	private String address;
-	private ArrayList<String> inputTxs = new ArrayList<String>();
-	private ArrayList<String> outputTxs = new ArrayList<String>();
+	private ArrayList<String> transactions = new ArrayList<String>();
 	
 	private long totalReceived = 0;
 	private long totalSent = 0;
@@ -26,8 +25,10 @@ public class AddressInfos {
 	 */
 	public void addTx(LoadedTransaction tx) {
 		
-		if(inputTxs.contains(tx.getUid()) || outputTxs.contains(tx.getUid()))
+		if(transactions.contains(tx.getUid()))
 			return;
+		
+		transactions.add(tx.getUid());
 
 		//calculate this transaction's impact on the address balance
 		
@@ -39,27 +40,18 @@ public class AddressInfos {
 		
 		//get the return output and add it to total, also add tx to inputs because there is something to spend on it
 		TxOutput returnOutput = tx.getOutputsMap().get(getAddress());
-		if(returnOutput != null) {
+		if(returnOutput != null)
 			total += returnOutput.getAmount();
-			inputTxs.add(tx.getUid());
-		}
+		
 		
 		//this transaction had something to do with this address
-		if(total > 0) {
+		if(total > 0)
 			//input transaction
 			if(tx.getStatus().isConfirmed())
 				totalReceived += total;
-			
-				
-		}else if(total < 0){
-			//output transaction
-			outputTxs.add(tx.getUid());
-			
+		else if(total < 0)
 			if(tx.getStatus().isConfirmed())
 				totalSent += Math.abs(total);
-			
-				
-		}
 		
 		
 	}
@@ -67,6 +59,10 @@ public class AddressInfos {
 	public void updateTx(LoadedTransaction tx, TxStatus newStatus, TxStatus formerStatus) {
 		if(tx == null)
 			return;
+		
+		if(!transactions.contains(tx.getUid()))
+			transactions.add(tx.getUid());
+		
 		
 		long total = 0;
 		
@@ -76,11 +72,8 @@ public class AddressInfos {
 		
 		//get the return output and add it to total, also add tx to inputs because there is something to spend on it
 		TxOutput returnOutput = tx.getOutputsMap().get(getAddress());
-		if(returnOutput != null) {
-			total += returnOutput.getAmount();
-			if(!inputTxs.contains(tx.getUid()))
-				inputTxs.add(tx.getUid());
-		}		
+		if(returnOutput != null)
+			total += returnOutput.getAmount();	
 
 		if(total > 0) {
 			//input transaction
@@ -96,9 +89,6 @@ public class AddressInfos {
 			}
 				
 		}else if(total < 0){
-			
-			if(!outputTxs.contains(tx.getUid()))
-				outputTxs.add(tx.getUid());
 			
 			//output transaction
 			total = Math.abs(total);
@@ -130,12 +120,8 @@ public class AddressInfos {
 		return totalSent;
 	}
 
-	public String[] getInputTxs() {
-		return inputTxs.toArray(new String[inputTxs.size()]);
-	}
-	
-	public String[] getOutputTxs() {
-		return outputTxs.toArray(new String[outputTxs.size()]);
+	public ArrayList<String> getTransactions() {
+		return new ArrayList<String>(transactions);
 	}
 	
 }

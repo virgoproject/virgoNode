@@ -6,7 +6,7 @@ public class Branch {
 
 	public Branch() {}
 	
-	public void addTx(LoadedTransaction tx) {
+	public synchronized void addTx(LoadedTransaction tx) {
 		
 		txCount++;
 		
