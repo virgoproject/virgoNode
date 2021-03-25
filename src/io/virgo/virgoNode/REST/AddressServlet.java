@@ -36,9 +36,19 @@ public class AddressServlet {
 						if(arguments.length >= 4)
 							pages = Math.abs(Integer.parseInt(arguments[3]));
 					}
-					ArrayList<String> transactions = infos.getTransactions();
-					JSONArray txs = new JSONArray(transactions.subList(Math.min((pages-1)*perPage, transactions.size()-1), Math.min(pages*perPage, transactions.size())));
-					return new Response(200,txs.toString());
+					
+					ArrayList<String> inputs = infos.getInputs();
+					JSONArray inputsJSON = new JSONArray(inputs.subList(Math.min((pages-1)*perPage, inputs.size()-1), Math.min(pages*perPage, inputs.size())));
+					
+					ArrayList<String> outputs = infos.getInputs();
+					JSONArray outputsJSON = new JSONArray(outputs.subList(Math.min((pages-1)*perPage, outputs.size()-1), Math.min(pages*perPage, outputs.size())));
+					
+					JSONObject response = new JSONObject();
+					response.put("inputs", inputsJSON);
+					response.put("inputs", outputsJSON);
+					
+					
+					return new Response(200,response.toString());
 					
 				}catch(NumberFormatException e) {
 					return new Response(405, "");

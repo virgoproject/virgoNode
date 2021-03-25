@@ -9,7 +9,9 @@ import io.virgo.virgoNode.DAG.TxStatus;
 public class AddressInfos {
 
 	private String address;
-	private ArrayList<String> transactions = new ArrayList<String>();
+	private ArrayList<String> inputs = new ArrayList<String>();
+	private ArrayList<String> outputs = new ArrayList<String>();
+
 	
 	private long totalReceived = 0;
 	private long totalSent = 0;
@@ -25,10 +27,8 @@ public class AddressInfos {
 	 */
 	public void addTx(LoadedTransaction tx) {
 		
-		if(transactions.contains(tx.getUid()))
+		if(inputs.contains(tx.getUid()) || outputs.contains(tx.getUid()))
 			return;
-		
-		transactions.add(tx.getUid());
 
 		//calculate this transaction's impact on the address balance
 		
@@ -40,8 +40,10 @@ public class AddressInfos {
 		
 		//get the return output and add it to total, also add tx to inputs because there is something to spend on it
 		TxOutput returnOutput = tx.getOutputsMap().get(getAddress());
-		if(returnOutput != null)
+		if(returnOutput != null){
 			total += returnOutput.getAmount();
+			inputs.add(tx.getUid());
+		}else outputs.add(tx.getUid());
 		
 		
 		//this transaction had something to do with this address
@@ -60,8 +62,8 @@ public class AddressInfos {
 		if(tx == null)
 			return;
 		
-		if(!transactions.contains(tx.getUid()))
-			transactions.add(tx.getUid());
+		if(!inputs.contains(tx.getUid()))
+			inputs.add(tx.getUid());
 		
 		
 		long total = 0;
@@ -72,8 +74,13 @@ public class AddressInfos {
 		
 		//get the return output and add it to total, also add tx to inputs because there is something to spend on it
 		TxOutput returnOutput = tx.getOutputsMap().get(getAddress());
-		if(returnOutput != null)
+		if(returnOutput != null) {
 			total += returnOutput.getAmount();	
+			if(!inputs.contains(tx.getUid()))
+				inputs.add(tx.getUid());
+		}else if(!outputs.contains(tx.getUid()))
+			outputs.add(tx.getUid());
+			
 
 		if(total > 0) {
 			//input transaction
@@ -120,8 +127,12 @@ public class AddressInfos {
 		return totalSent;
 	}
 
-	public ArrayList<String> getTransactions() {
-		return new ArrayList<String>(transactions);
+	public ArrayList<String> getInputs() {
+		return new ArrayList<String>(inputs);
+	}
+	
+	public ArrayList<String> getOutputs() {
+		return new ArrayList<String>(outputs);
 	}
 	
 }

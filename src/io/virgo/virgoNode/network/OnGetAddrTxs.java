@@ -1,5 +1,7 @@
 package io.virgo.virgoNode.network;
 
+import java.util.ArrayList;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -25,7 +27,12 @@ public class OnGetAddrTxs {
 			
 			if(Main.getDAG().infos.hasAddressInfos(address)) {
 				AddressInfos addrInfos = Main.getDAG().infos.getAddressInfos(address);
-				txs.put("txs", new JSONArray(addrInfos.getTransactions()));
+				
+				JSONArray inputsJSON = new JSONArray(addrInfos.getInputs());
+				JSONArray outputsJSON = new JSONArray(addrInfos.getOutputs());
+				
+				txs.put("inputs", inputsJSON);
+				txs.put("outputs", outputsJSON);
 			} else
 				txs.put("txs", new JSONArray());
 			
