@@ -3,6 +3,7 @@ package io.virgo.virgoNode.DAG;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.Stack;
 import java.util.Map.Entry;
 
 import io.virgo.virgoNode.DAG.Events.TransactionLoadedEvent;
@@ -16,16 +17,13 @@ public class LoadedTransaction extends Transaction {
 	
 	private DAG dag;
 	
-	//branchs the transaction is part of and it's position in it
-	LinkedHashMap<Branch, Integer> partOf = new LinkedHashMap<Branch, Integer>();//part of branch till
-	
 	LinkedHashMap<BeaconBranch, Long> beaconBranchs = new LinkedHashMap<BeaconBranch, Long>();//branch displacement
 	
 	public ArrayList<String> childs = new ArrayList<String>();
 	
 	private ArrayList<LoadedTransaction> loadedParents = new ArrayList<LoadedTransaction>();
 	
-	private long height = 0;
+	private int height = 0;
 	
 	private ArrayList<TxOutput> loadedInputs = new ArrayList<TxOutput>();
 	private ArrayList<LoadedTransaction> loadedInputTxs = new ArrayList<LoadedTransaction>();
@@ -73,18 +71,6 @@ public class LoadedTransaction extends Transaction {
 			//add this transaction to parents's child list
 			parent.addChild(this);
 			
-			//add all branch parent is part of to this transaction branchs list
-			//If a banch is already present in the list take the highest position
-			//See documentation on virgocoin.io for more informations
-			for(Branch branch : parent.partOf.keySet()) {
-				if(partOf.containsKey(branch)) {
-					if(parent.partOf.get(branch) > partOf.get(branch))
-						partOf.put(branch, parent.partOf.get(branch));
-				} else {
-					partOf.put(branch, parent.partOf.get(branch));
-				}
-			}
-			
 			//Remove parent from tips list if in it
 			dag.childLessTxs.remove(parent);
 		}
@@ -94,10 +80,8 @@ public class LoadedTransaction extends Transaction {
 			height = loadedParents.get(0).getHeight() + 1;
 		else
 			for(LoadedTransaction parent : loadedParents)
-				if(parent.getHeight() > height)
+				if(parent.getHeight() > height-1)
 					height = parent.getHeight() + 1;
-		
-		setupBranch();
 		
 		dag.getEventListener().notify(new TransactionLoadedEvent(this));
 	}
@@ -109,11 +93,6 @@ public class LoadedTransaction extends Transaction {
 		this.dag = dag;
 		
 		status = TxStatus.CONFIRMED;
-		
-		dag.nodesToCheck.put(0l, this);
-		
-		Branch branch = new Branch();
-		branch.addTx(this);
 		
 		difficulty = 10000;
 		mainChainMember = true;
@@ -190,18 +169,6 @@ public class LoadedTransaction extends Transaction {
 			//add this transaction to parents's child list
 			parent.addChild(this);
 			
-			//add all branch parent is part of to this transaction branchs list
-			//If a banch is already present in the list take the highest position
-			//See documentation on virgocoin.io for more informations
-			for(Branch branch : parent.partOf.keySet()) {
-				if(partOf.containsKey(branch)) {
-					if(parent.partOf.get(branch) > partOf.get(branch))
-						partOf.put(branch, parent.partOf.get(branch));
-				} else {
-					partOf.put(branch, parent.partOf.get(branch));
-				}
-			}
-			
 			//Remove parent from tips list if in it
 			dag.childLessTxs.remove(parent);
 		}
@@ -211,10 +178,9 @@ public class LoadedTransaction extends Transaction {
 			height = loadedParents.get(0).getHeight() + 1;
 		else
 			for(LoadedTransaction parent : loadedParents)
-				if(parent.getHeight() > height)
+				if(parent.getHeight() > height-1)
 					height = parent.getHeight() + 1;
 		
-		setupBranch();
 		setupBeaconBranch();
 		
 		dag.getEventListener().notify(new TransactionLoadedEvent(this));
@@ -240,33 +206,6 @@ public class LoadedTransaction extends Transaction {
 		
 		
 		chooseNextBeacon();
-	}
-	
-	/**
-	 * Setup branching for this transaction
-	 * Branching optimizes weight calculation by forming groups of transaction
-	 */
-	private void setupBranch() {
-		if(loadedParents.size() != 1) {
-			//create a branch and add it to parents direct branch with /2 modifier (distibute weight equally between parents)
-			Branch branch = new Branch();
-			branch.addTx(this);
-			
-		}else {
-			
-			LoadedTransaction parent = loadedParents.get(0);
-			
-			if(parent.childs.size() == 1)//transaction is parent's first child, make part of parent's main branch
-				parent.getMainBranch().addTx(this);
-			else {
-				
-				Branch branch = new Branch();
-				branch.addTx(this);
-				
-			}
-			
-		}
-		
 	}
 	
 	private void chooseNextBeacon() {
@@ -440,26 +379,47 @@ public class LoadedTransaction extends Transaction {
 	 * @return true if this transaction is a direct child of target, false otherwise
 	 */
 	public boolean isChildOf(LoadedTransaction target) {
+		if(height < target.height)
+			return false;
 		
-		boolean result = false;
+		if(height == target.height)
+			return target == this;
 		
-		for(Branch branch : target.partOf.keySet())
-			if(partOf.containsKey(branch)) {
-				if(partOf.get(branch) < target.partOf.get(branch))
-					result=  false;
-				
-			} else result=  false;
-			
+		ArrayList<ArrayList<LoadedTransaction>> tab = new ArrayList<ArrayList<LoadedTransaction>>();
+		for(int i = 0; i < height - target.height - 1; i++)
+			tab.add(i, new ArrayList<LoadedTransaction>());
 		
-		result= true;
+        Stack<LoadedTransaction> stack = new Stack<LoadedTransaction>();
+        stack.push(this);
 
-		
-		boolean trueResult = hardIsChildOf(target);
-		
-		return trueResult;
+	    while(!stack.isEmpty())
+	    {
+	    		LoadedTransaction current = stack.pop(); 
+	            for(LoadedTransaction parent : current.getLoadedParents()) {
+	
+	            if(parent.height < target.height)
+	                continue;
+	            
+	                if(parent.height == target.height) {
+	                    if(parent == target)
+	                        return true;
+	                    continue;
+	                }
+	
+	                if(!tab.get(parent.height - target.height - 1).contains(parent)) {
+	                    tab.get(parent.height - target.height - 1).add(parent);
+	                    stack.push(parent);
+	                }
+	            }
+	    }
+        
+        return false;
 	}
 	
 	public boolean hardIsChildOf(LoadedTransaction target) {
+		
+		if(target == this)
+			return true;
 		
 		if(isGenesis())
 			return false;
@@ -511,10 +471,6 @@ public class LoadedTransaction extends Transaction {
 		dag.writer.push(this);
 	}
 	
-	public Branch getMainBranch() {
-		return partOf.keySet().iterator().next();
-	}
-	
 	public BeaconBranch getMainBeaconBranch() {
 		return beaconBranchs.keySet().iterator().next();
 	}
@@ -539,7 +495,7 @@ public class LoadedTransaction extends Transaction {
 		return loadedParentBeacon;
 	}
 	
-	public long getHeight() {
+	public int getHeight() {
 		return height;
 	}
 	

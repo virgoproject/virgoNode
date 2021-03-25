@@ -55,6 +55,8 @@ public class beaconServlet {
 				response.put("difficulty", beacon.getDifficulty());
 				response.put("isMainChainMember", beacon.isMainChainMember());
 				response.put("randomXKey", beacon.getRandomXKey());
+				response.put("weight", beacon.getWeight());
+				response.put("confirmations", beacon.confirmationCount());
 				
 				return new Response(200, response.toString());
 			}

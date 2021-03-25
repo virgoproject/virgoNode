@@ -49,7 +49,7 @@ public class Server {
 	        			break;
 	        			
 	        		case "beacon":
-	        			response = WorkServlet.GET();
+	        			response = beaconServlet.GET(requestArguments);
 	        			break;
 	        			
         		}

@@ -8,10 +8,8 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.NavigableMap;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.json.JSONArray;
@@ -41,7 +39,7 @@ import io.virgo.virgoNode.network.Peers;
 public class DAG {
 
 	private List<String> processingTransactions = Collections.synchronizedList(new ArrayList<String>());
-	private ConcurrentHashMap<String, LoadedTransaction> loadedTransactions = new ConcurrentHashMap<String, LoadedTransaction>();	protected NavigableMap<Long, LoadedTransaction> nodesToCheck = Collections.synchronizedNavigableMap(new TreeMap<Long, LoadedTransaction>());
+	private ConcurrentHashMap<String, LoadedTransaction> loadedTransactions = new ConcurrentHashMap<String, LoadedTransaction>();
 	ConcurrentHashMap<String, List<OrphanTransaction>> waitedTxs = new ConcurrentHashMap<String, List<OrphanTransaction>>();
 	protected List<String> waitingTxsUids = Collections.synchronizedList(new ArrayList<String>());
 	List<LoadedTransaction> childLessTxs = Collections.synchronizedList(new ArrayList<LoadedTransaction>());
@@ -310,7 +308,7 @@ public class DAG {
 		//check if transaction is effectively child of it's parent beacon
 		boolean childOf = false;
 		for(LoadedTransaction parent : loadedParents)
-			if(parent.isChildOf(parentBeacon) || parent.equals(parentBeacon)) {
+			if(parent.isChildOf(parentBeacon)) {
 				childOf = true;
 				break;
 			}
