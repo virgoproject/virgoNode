@@ -62,8 +62,10 @@ public class AddressServlet {
 				
 				return new Response(200, balance.toString());
 				
-				default: return new Response(405, "");
-					
+			case "unspent":
+				return new Response(200, new JSONArray(infos.getUnspentInputs()).toString());
+				
+			default: return new Response(405, "");
 				
 			}
 			

@@ -12,6 +12,7 @@ public class AddressInfos {
 	private ArrayList<String> inputs = new ArrayList<String>();
 	private ArrayList<String> outputs = new ArrayList<String>();
 
+	private ArrayList<String> unspentInputs = new ArrayList<String>();
 	
 	private long totalReceived = 0;
 	private long totalSent = 0;
@@ -39,10 +40,12 @@ public class AddressInfos {
 			total -= tx.getTotalInput();
 		
 		//get the return output and add it to total, also add tx to inputs because there is something to spend on it
-		TxOutput returnOutput = tx.getOutputsMap().get(getAddress());
-		if(returnOutput != null){
-			total += returnOutput.getAmount();
+		TxOutput input = tx.getOutputsMap().get(getAddress());
+		if(input != null){
+			total += input.getAmount();
 			inputs.add(tx.getUid());
+			if(!tx.getStatus().isConfirmed())
+				unspentInputs.add(tx.getUid());
 		}else outputs.add(tx.getUid());
 		
 		
@@ -62,10 +65,6 @@ public class AddressInfos {
 		if(tx == null)
 			return;
 		
-		if(!inputs.contains(tx.getUid()))
-			inputs.add(tx.getUid());
-		
-		
 		long total = 0;
 		
 		if(tx.getAddress().equals(getAddress()))//we are sending funds
@@ -73,11 +72,17 @@ public class AddressInfos {
 			total -= tx.getTotalInput();
 		
 		//get the return output and add it to total, also add tx to inputs because there is something to spend on it
-		TxOutput returnOutput = tx.getOutputsMap().get(getAddress());
-		if(returnOutput != null) {
-			total += returnOutput.getAmount();	
+		TxOutput input = tx.getOutputsMap().get(getAddress());
+		if(input != null) {
+			total += input.getAmount();	
 			if(!inputs.contains(tx.getUid()))
 				inputs.add(tx.getUid());
+			
+			if(newStatus.isConfirmed())
+				unspentInputs.remove(tx.getUid());
+			else if(!unspentInputs.contains(tx.getUid()))
+				unspentInputs.add(tx.getUid());
+			
 		}else if(!outputs.contains(tx.getUid()))
 			outputs.add(tx.getUid());
 			
@@ -128,6 +133,10 @@ public class AddressInfos {
 	}
 
 	public ArrayList<String> getInputs() {
+		return new ArrayList<String>(inputs);
+	}
+	
+	public ArrayList<String> getUnspentInputs() {
 		return new ArrayList<String>(inputs);
 	}
 	

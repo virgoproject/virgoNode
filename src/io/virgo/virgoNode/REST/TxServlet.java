@@ -77,6 +77,17 @@ public class TxServlet {
 							outputState.put("amount", out.getAmount());
 							outputState.put("spent", out.isSpent());
 							
+							JSONArray outClaimers = new JSONArray();
+							
+							for(LoadedTransaction claimer : out.claimers) {
+								JSONObject outClaimer = new JSONObject();
+								outClaimer.put("id", claimer.getUid());
+								outClaimer.put("status", claimer.getStatus().getCode());
+								outClaimers.put(outClaimer);
+							}
+							
+							outputState.put("claimers", outClaimers);
+							
 							txOutputs.put(outputState);
 						}
 						
