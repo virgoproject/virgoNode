@@ -45,7 +45,7 @@ public class AddressServlet {
 					
 					JSONObject response = new JSONObject();
 					response.put("inputs", inputsJSON);
-					response.put("inputs", outputsJSON);
+					response.put("outputs", outputsJSON);
 					
 					
 					return new Response(200,response.toString());

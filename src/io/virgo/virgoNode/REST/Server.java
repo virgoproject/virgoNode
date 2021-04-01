@@ -24,6 +24,8 @@ public class Server {
             	String requestedServlet = rawArgs[0];
             	String[] requestArguments = Arrays.copyOfRange(rawArgs, 1, rawArgs.length);
         		
+            	String requestBody = new String(exchange.getRequestBody().readAllBytes());
+            	
             	Response response = new Response(405, "");// 405 Method Not Allowed
             	
             	switch(requestedServlet) {
@@ -33,7 +35,10 @@ public class Server {
         				break;
         				
 	        		case "tx":
-	        			response = TxServlet.GET(requestArguments);
+	        			if(requestBody.equals(""))
+	        				response = TxServlet.GET(requestArguments);
+	        			else
+	        				response = TxServlet.POST(requestArguments, requestBody);
 	        			break;
 	        			
 	        		case "nodeinfos":

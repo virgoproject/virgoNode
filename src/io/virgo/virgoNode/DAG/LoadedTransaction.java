@@ -467,7 +467,6 @@ public class LoadedTransaction extends Transaction {
 	}
 	
 	public void save() {
-		System.out.println("saving " + getUid());
 		dag.writer.push(this);
 	}
 	

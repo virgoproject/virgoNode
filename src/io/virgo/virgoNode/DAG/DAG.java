@@ -279,7 +279,6 @@ public class DAG {
 		//check if transaction has no useless parent
 		if(loadedParents.size() > 1 && (loadedParents.get(0).isChildOf(loadedParents.get(1)) || loadedParents.get(1).isChildOf(loadedParents.get(0)))) {
 			processingTransactions.remove(tx.getUid());
-			System.out.println("2 " + tx.getUid() + " " + loadedParents.get(0).getUid() + " " + loadedParents.get(1).getUid());
 			return;
 		}
 		
@@ -301,7 +300,6 @@ public class DAG {
 		
 		if(tx.getDate() < medianTime || tx.getDate() > System.currentTimeMillis()+900000) {
 			processingTransactions.remove(tx.getUid());
-			System.out.println("3");
 			return;
 		}
 		
@@ -315,7 +313,6 @@ public class DAG {
 				
 		if(!childOf) {
 			processingTransactions.remove(tx.getUid());
-			System.out.println("4");
 			return;
 		}
 		
@@ -343,7 +340,6 @@ public class DAG {
 		//check if required difficulty is met
 		if(hashValue >= Main.MAX_DIFFICULTY/parentBeacon.getDifficulty()) {
 			processingTransactions.remove(tx.getUid());
-			System.out.println("5");
 			return;
 		}
 		

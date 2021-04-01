@@ -1,8 +1,11 @@
 package io.virgo.virgoNode.REST;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
+import io.virgo.virgoCryptoLib.Converter;
+import io.virgo.virgoCryptoLib.Sha256;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.DAG.LoadedTransaction;
 import io.virgo.virgoNode.DAG.TxOutput;
@@ -57,7 +60,13 @@ public class TxServlet {
 						
 						txState.put("status", tx.getStatus().ordinal());
 						txState.put("confirmations", tx.confirmationCount());
-						txState.put("beacon", tx.getSettlingTransaction().getUid());
+						
+						LoadedTransaction settler = tx.getSettlingTransaction();
+						
+						if(settler != null)
+							txState.put("beacon", settler.getUid());
+						else
+							txState.put("beacon", "");
 						
 						JSONArray txOutputs = new JSONArray();
 						
@@ -92,6 +101,16 @@ public class TxServlet {
 		
 		}		
 		
+	}
+
+	public static Response POST(String[] arguments, String requestBody) {
+		try {
+			JSONObject txJSON = new JSONObject(requestBody);
+			Main.getDAG().initTx(txJSON, false);
+			return new Response(200, "");
+		}catch(JSONException|IllegalArgumentException e) {
+			return new Response(405, "");
+		}
 	}
 	
 }

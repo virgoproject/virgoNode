@@ -37,7 +37,6 @@ public class TxLoader implements Runnable{
 					
 				} catch (JSONException | SQLException | IllegalArgumentException e) {
 					Peers.askTxs(Arrays.asList(txUid));
-					System.out.println("not found " + txUid);
 				}				
 				
 			} catch (InterruptedException e) {
