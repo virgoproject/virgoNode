@@ -223,59 +223,58 @@ public class LoadedTransaction extends Transaction {
 		if(loadedChildBeacons.size() == 1) {
 			loadedChildBeacons.get(0).mainChainMember = true;
 			loadedChildBeacons.get(0).chooseNextBeacon();
-		}else {
+			return;
+		}
 			
-			LoadedTransaction mainChainBeaconChild = null;
+		LoadedTransaction mainChainBeaconChild = null;
+		
+		for(LoadedTransaction childBeacon : loadedChildBeacons) {
+			if(childBeacon.mainChainMember) {
+				mainChainBeaconChild = childBeacon;
+				break;
+			}
+		}
+		
+		if(mainChainBeaconChild == null) {
 			
-			for(LoadedTransaction childBeacon : loadedChildBeacons) {
-				if(childBeacon.mainChainMember) {
+			for(LoadedTransaction childBeacon : loadedChildBeacons)
+				if(mainChainBeaconChild == null || mainChainBeaconChild.getWeight() < childBeacon.getWeight())
 					mainChainBeaconChild = childBeacon;
-					break;
-				}
-			}
 			
-			if(mainChainBeaconChild == null) {
-				
-				for(LoadedTransaction childBeacon : loadedChildBeacons)
-					if(mainChainBeaconChild == null || mainChainBeaconChild.getWeight() < childBeacon.getWeight())
-						mainChainBeaconChild = childBeacon;
-				
-				
-				for(LoadedTransaction childBeacon : loadedChildBeacons)
-					if(mainChainBeaconChild != childBeacon && childBeacon.getWeight() == mainChainBeaconChild.getWeight())
-						return;
-				
-				for(LoadedTransaction childBeacon : loadedChildBeacons)
-					if(childBeacon != mainChainBeaconChild)
-						childBeacon.rejectTx();
-				
-				mainChainBeaconChild.mainChainMember = true;
-				mainChainBeaconChild.chooseNextBeacon();
-				
-			} else {
-				
-				for(LoadedTransaction childBeacon : loadedChildBeacons)
-					if(mainChainBeaconChild != childBeacon && childBeacon.getWeight() == mainChainBeaconChild.getWeight()) {
-						mainChainBeaconChild.undoChain();
-						return;
-					}
-				
-				LoadedTransaction biggestChild = mainChainBeaconChild;
-				for(LoadedTransaction childBeacon : loadedChildBeacons)
-					if(biggestChild != childBeacon && biggestChild.getWeight() < childBeacon.getWeight())
-						biggestChild = childBeacon;
-				
-				if(biggestChild != mainChainBeaconChild) {
+			
+			for(LoadedTransaction childBeacon : loadedChildBeacons)
+				if(mainChainBeaconChild != childBeacon && childBeacon.getWeight() == mainChainBeaconChild.getWeight())
+					return;
+			
+			for(LoadedTransaction childBeacon : loadedChildBeacons)
+				if(childBeacon != mainChainBeaconChild)
+					childBeacon.rejectTx();
+			
+			mainChainBeaconChild.mainChainMember = true;
+			mainChainBeaconChild.chooseNextBeacon();
+			
+		} else {
+			
+			for(LoadedTransaction childBeacon : loadedChildBeacons)
+				if(mainChainBeaconChild != childBeacon && childBeacon.getWeight() == mainChainBeaconChild.getWeight()) {
 					mainChainBeaconChild.undoChain();
-					biggestChild.mainChainMember = true;
-					biggestChild.chooseNextBeacon();
+					return;
 				}
-				
-				for(LoadedTransaction childBeacon : loadedChildBeacons)
-					if(childBeacon != biggestChild)
-						childBeacon.rejectTx();
+			
+			LoadedTransaction biggestChild = mainChainBeaconChild;
+			for(LoadedTransaction childBeacon : loadedChildBeacons)
+				if(biggestChild != childBeacon && biggestChild.getWeight() < childBeacon.getWeight())
+					biggestChild = childBeacon;
+			
+			if(biggestChild != mainChainBeaconChild) {
+				mainChainBeaconChild.undoChain();
+				biggestChild.mainChainMember = true;
+				biggestChild.chooseNextBeacon();
 			}
 			
+			for(LoadedTransaction childBeacon : loadedChildBeacons)
+				if(childBeacon != biggestChild)
+					childBeacon.rejectTx();
 		}
 		
 	}
@@ -293,8 +292,8 @@ public class LoadedTransaction extends Transaction {
 			b:
 			for(TxOutput input : conflictingTransaction.loadedInputs) {
 				for(LoadedTransaction claimer : input.claimers)
-					if(claimer != this)
-						if(claimer.confirmationCount() >= confirmationCount()) {
+					if(claimer != conflictingTransaction)
+						if(claimer.confirmationCount() >= conflictingTransaction.confirmationCount()) {
 							canConfirm = false;
 							break b;
 						} 
@@ -316,17 +315,18 @@ public class LoadedTransaction extends Transaction {
 		settlingTransaction = tx;
 
 		for(LoadedTransaction inputTx : loadedInputTxs)
-			if(inputTx.getStatus().isRefused())
+			if(inputTx.getStatus().isRefused() || inputTx.getOutputsMap().get(getAddress()).isSpent())
 				rejectTx();
 		
 		boolean canConfirm = true;
 		for(TxOutput input : loadedInputs)
-			if(input.claimers.size() > 1) {
-				settlingTransaction.conflictualTxs.add(this);
-				canConfirm = false;
-				break;
-			}
-				
+			for(LoadedTransaction claimer : input.claimers)
+				if(claimer != this && !claimer.getStatus().isRefused()) {
+					settlingTransaction.conflictualTxs.add(this);
+					canConfirm = false;
+					break;
+				}
+		
 		if(canConfirm)
 			confirmTx();
 		

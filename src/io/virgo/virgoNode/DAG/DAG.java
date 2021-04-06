@@ -11,6 +11,9 @@ import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -60,6 +63,8 @@ public class DAG {
 	private RandomX randomX;
 	private RandomX_VM randomX_vm;
 	
+	ThreadPoolExecutor transactionExecutorPool;
+	
 	public DAG(int saveInterval) throws IOException {
 		this.saveInterval = saveInterval;
 		
@@ -83,7 +88,10 @@ public class DAG {
 		currentVmKey = genesis.getRandomXKey();
 		
 		System.out.println("Genesis TxUid is " + genesis.getUid());
-		
+				
+		transactionExecutorPool = (ThreadPoolExecutor) Executors.newFixedThreadPool(50);
+		transactionExecutorPool.setKeepAliveTime(600000, TimeUnit.MILLISECONDS);
+
 		//start transaction writer thread (writes transactions to disk)
 		writer = new TxWriter(this);
 		new Thread(writer).start();
@@ -245,11 +253,10 @@ public class DAG {
 				constructedOutput.toArray(new TxOutput[1]),
 				parentBeacon, nonce, date, saved);
 		
-		initBeaconTx(tx);
-		
+		transactionExecutorPool.submit(new addTxTask(tx));
 	}
 	
-	public void initBeaconTx(Transaction tx) {
+	void initBeaconTx(Transaction tx) {
 		
 		ArrayList<String> waitedTxs = new ArrayList<String>();
 		
@@ -356,7 +363,6 @@ public class DAG {
 		
 		//try to load any transaction that was waiting for this one to load
 		removeWaitedTx(loadedTx.getUid());		
-		
 	}
 	
 	/**
@@ -418,14 +424,13 @@ public class DAG {
 				constructedOutputs.toArray(new TxOutput[constructedOutputs.size()]),
 				date, saved);
 		
-		initTx(tx);
-		
+		transactionExecutorPool.submit(new addTxTask(tx));
 	}
 	
 	/**
 	 * Initiate transaction from Transaction object
 	 */
-	public void initTx(Transaction tx) {
+	void initTx(Transaction tx) {
 		ArrayList<String> waitedTxs = new ArrayList<String>();
 		
 		//Check for missing parents 
@@ -514,8 +519,7 @@ public class DAG {
 		processingTransactions.remove(tx.getUid());
 		
 		//try to load any transaction that was waiting for this one to load
-		removeWaitedTx(loadedTx.getUid());		
-		
+		removeWaitedTx(loadedTx.getUid());
 	}
 	
 	/**
@@ -733,6 +737,24 @@ public class DAG {
 	
 	public LoadedTransaction[] getTips() {
 		return childLessTxs.toArray(new LoadedTransaction[childLessTxs.size()]);
+	}
+	
+	public class addTxTask implements Runnable {
+
+		private Transaction transaction;
+		
+		public addTxTask(Transaction transaction) {
+			this.transaction = transaction;
+		}
+		
+		@Override
+		public void run() {
+			if(transaction.isBeaconTransaction())
+				initBeaconTx(transaction);
+			else
+				initTx(transaction);
+		}
+		
 	}
 	
 }

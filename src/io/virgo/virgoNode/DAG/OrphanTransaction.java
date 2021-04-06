@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 
 import io.virgo.virgoNode.Main;
+import io.virgo.virgoNode.DAG.DAG.addTxTask;
 
 /**
  * Transaction waiting for parents or inputs to be loaded
@@ -27,10 +28,7 @@ public class OrphanTransaction extends Transaction {
 		//if no more transaction to wait load this transaction to DAG
 		if(waitedTxs.size() == 0) {
 			Main.getDAG().waitingTxsUids.remove(getUid());
-			if(isBeaconTransaction())
-				Main.getDAG().initBeaconTx(this);
-			else
-				Main.getDAG().initTx(this);
+			Main.getDAG().transactionExecutorPool.submit(new AddTransactionTask(this));
 		}
 	}
 }

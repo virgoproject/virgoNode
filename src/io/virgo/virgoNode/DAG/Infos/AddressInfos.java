@@ -11,8 +11,7 @@ public class AddressInfos {
 	private String address;
 	private ArrayList<String> inputs = new ArrayList<String>();
 	private ArrayList<String> outputs = new ArrayList<String>();
-
-	private ArrayList<String> unspentInputs = new ArrayList<String>();
+	private ArrayList<String> transactions = new ArrayList<String>();
 	
 	private long totalReceived = 0;
 	private long totalSent = 0;
@@ -28,26 +27,26 @@ public class AddressInfos {
 	 */
 	public void addTx(LoadedTransaction tx) {
 		
-		if(inputs.contains(tx.getUid()) || outputs.contains(tx.getUid()))
+		if(transactions.contains(tx.getUid()))
 			return;
 
 		//calculate this transaction's impact on the address balance
-		
 		long total = 0;
 		
-		if(tx.getAddress().equals(getAddress()))//we are sending funds
-			//get every input transaction and substract it's value from total
+		if(tx.getAddress().equals(getAddress())){
 			total -= tx.getTotalInput();
+			outputs.add(0, tx.getUid());
+		}
 		
 		//get the return output and add it to total, also add tx to inputs because there is something to spend on it
 		TxOutput input = tx.getOutputsMap().get(getAddress());
 		if(input != null){
 			total += input.getAmount();
-			inputs.add(tx.getUid());
-			if(!tx.getStatus().isConfirmed())
-				unspentInputs.add(tx.getUid());
-		}else outputs.add(tx.getUid());
+			inputs.add(0, tx.getUid());
+		}
 		
+		if(total != 0)
+			transactions.add(0, tx.getUid());
 		
 		//this transaction had something to do with this address
 		if(total > 0)
@@ -62,7 +61,7 @@ public class AddressInfos {
 	}
 	
 	public void updateTx(LoadedTransaction tx, TxStatus newStatus, TxStatus formerStatus) {
-		if(tx == null)
+		if(!transactions.contains(tx.getUid()))
 			return;
 		
 		long total = 0;
@@ -73,19 +72,9 @@ public class AddressInfos {
 		
 		//get the return output and add it to total, also add tx to inputs because there is something to spend on it
 		TxOutput input = tx.getOutputsMap().get(getAddress());
-		if(input != null) {
-			total += input.getAmount();	
-			if(!inputs.contains(tx.getUid()))
-				inputs.add(tx.getUid());
-			
-			if(newStatus.isConfirmed())
-				unspentInputs.remove(tx.getUid());
-			else if(!unspentInputs.contains(tx.getUid()))
-				unspentInputs.add(tx.getUid());
-			
-		}else if(!outputs.contains(tx.getUid()))
-			outputs.add(tx.getUid());
-			
+		if(input != null)
+			total += input.getAmount();				
+		
 
 		if(total > 0) {
 			//input transaction
@@ -132,11 +121,11 @@ public class AddressInfos {
 		return totalSent;
 	}
 
-	public ArrayList<String> getInputs() {
-		return new ArrayList<String>(inputs);
+	public ArrayList<String> getTransactions() {
+		return new ArrayList<String>(transactions);
 	}
 	
-	public ArrayList<String> getUnspentInputs() {
+	public ArrayList<String> getInputs() {
 		return new ArrayList<String>(inputs);
 	}
 	
