@@ -13,9 +13,11 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import io.virgo.virgoCryptoLib.Converter;
+import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.DAG.LoadedTransaction;
 import io.virgo.virgoNode.DAG.Transaction;
 import io.virgo.virgoNode.DAG.TxOutput;
+import io.virgo.virgoNode.Utils.Miscellaneous;
 
 public class Database {
 
@@ -35,7 +37,7 @@ public class Database {
 		tipsCreateStmt.execute("CREATE TABLE IF NOT EXISTS tips (id text PRIMARY key, height integer);");
 		
 		Statement txsCreateStmt = conn.createStatement();
-		txsCreateStmt.execute("CREATE TABLE IF NOT EXISTS txs (id text PRIMARY key, sig data, pubKey data, parents text, inputs text, outputs text, parentBeacon text, nonce integer, date integer);");
+		txsCreateStmt.execute("CREATE TABLE IF NOT EXISTS txs (id text PRIMARY key, sig data, pubKey data, parents text, inputs text, outputs text, parentBeacon text, nonce String, date integer);");
 		
 	}
 	
@@ -64,7 +66,7 @@ public class Database {
 		insertStmt.setString(6, outputsJson.toString());
     	
 		insertStmt.setString(7, tx.getParentBeaconUid());
-		insertStmt.setLong(8, tx.getNonce());
+		insertStmt.setString(8, tx.getNonce());
 		insertStmt.setLong(9, tx.getDate());
 		
     	insertStmt.executeUpdate();
@@ -72,6 +74,8 @@ public class Database {
 	}
 	
 	public JSONObject getTx(String txId) throws SQLException {
+		if(!Miscellaneous.validateAddress(txId, Main.TX_IDENTIFIER))
+			return null;
 		
         String sql = "SELECT * FROM txs WHERE id='"+txId+"'";
         

@@ -1,28 +1,29 @@
 package io.virgo.virgoNode.DAG;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 
 public class BeaconBranch {
 	
 	private ArrayList<LoadedTransaction> transactions = new ArrayList<LoadedTransaction>();
-	private long branchWeight = 0;
+	private BigInteger branchWeight = BigInteger.ZERO;
 	
 	public BeaconBranch() {}
 	
-	public long addTx(LoadedTransaction tx) {
+	public BigInteger addTx(LoadedTransaction tx) {
 		
 		transactions.add(tx);
 		
-		long displacement = branchWeight;
+		BigInteger displacement = branchWeight;
 		
-		branchWeight+=tx.getDifficulty();
+		branchWeight = branchWeight.add(tx.getDifficulty());
 		
 		return displacement;
 		
 	}
 	
-	public long getBranchWeight() {
+	public BigInteger getBranchWeight() {
 		return branchWeight;
 	}
 	

@@ -36,6 +36,7 @@ public class OnTxs {
 			
 			if(Main.getDAG().hasTransaction(txUid))
 				continue;
+			
 
 			try {
 				Main.getDAG().initTx(txJson, false);

@@ -34,7 +34,7 @@ public class Transaction {
 	
 	//beacon transaction related variables
 	private String parentBeaconUid = null;
-	private long nonce = 0;
+	private String nonce = "";
 	
 	private boolean isSaved;
 	
@@ -64,7 +64,7 @@ public class Transaction {
 		
 	}
 	
-	public Transaction(String uid, String[] parentsUid, TxOutput[] outputs, String parentBeaconUid, long nonce, long date, boolean isSaved) {
+	public Transaction(String uid, String[] parentsUid, TxOutput[] outputs, String parentBeaconUid, String nonce, long date, boolean isSaved) {
 		
 		this.uid = uid;
 		address = outputs[0].getAddress();
@@ -108,7 +108,7 @@ public class Transaction {
 		returnAmount = 0;
 		
 		parentBeaconUid = "";
-		nonce = 0;
+		nonce = "";
 		
 	}
 	
@@ -178,7 +178,7 @@ public class Transaction {
 		return parentBeaconUid;
 	}
 	
-	public long getNonce() {
+	public String getNonce() {
 		return nonce;
 	}
 	

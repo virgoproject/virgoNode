@@ -41,12 +41,10 @@ public class Main {
 	public static final long BEACON_REWARD = (long) (5 * Math.pow(10, DECIMALS));
 	public static final byte[] ADDR_IDENTIFIER = new BigInteger("4039").toByteArray();
 	public static final byte[] TX_IDENTIFIER = new BigInteger("3823").toByteArray();
-	public static final long MAX_DIFFICULTY = 72056494526300160l;
+	public static final BigInteger MAX_DIFFICULTY = new BigInteger("115792089237316195423570985008687907853269984665640564039457584007913129639935");//value of 0x00000000FFFF0000000000000000000000000000000000000000000000000000
 	
 	//ugly debug stats
-	public static int confirmedTxCount = 0;
 	public static int txsSec = 0;
-	public static int rejectedTxCount = 0;
 	static String[] runningIndicators = {"-", "\\", "|", "/"};
 	static int currentIndicator = 0;
 	
@@ -118,8 +116,7 @@ public class Main {
 
 			@Override
 			public void run() {
-				confirmedTxCount += txsSec;
-				System.out.print("\r " + txsSec + " txs/s | " + confirmedTxCount + " in total | " + dag.getPoolSize() + " txs waiting | " + net.getPeers().size() + " peers " + runningIndicators[currentIndicator]);
+				System.out.print("\r " + txsSec + " txs/s | " + dag.loadedTxsCount() + " in total | " + dag.getPoolSize() + " txs waiting | " + net.getPeers().size() + " peers " + runningIndicators[currentIndicator]);
 				txsSec = 0;
 				currentIndicator++;
 				if(currentIndicator > 3)

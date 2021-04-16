@@ -13,7 +13,7 @@ public class WorkServlet {
 		
 		JSONObject response = new JSONObject();
 		response.put("parentBeacon", bestParentBeacon.getUid());
-		response.put("difficulty", bestParentBeacon.getDifficulty());
+		response.put("difficulty", bestParentBeacon.getDifficulty().toString());
 		response.put("key", bestParentBeacon.getRandomXKey());
 		
 		JSONArray parentTxs = new JSONArray();

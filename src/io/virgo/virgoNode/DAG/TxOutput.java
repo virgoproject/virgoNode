@@ -2,6 +2,8 @@ package io.virgo.virgoNode.DAG;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 import io.virgo.virgoCryptoLib.Converter;
 import io.virgo.virgoNode.Main;
@@ -12,7 +14,7 @@ public class TxOutput {
 	private String originTx;
 	private String address;
 	private long amount;
-	public ArrayList<LoadedTransaction> claimers = new ArrayList<LoadedTransaction>();
+	public List<LoadedTransaction> claimers = Collections.synchronizedList(new ArrayList<LoadedTransaction>());
 	
 	public TxOutput(String address, long amount, String originTx) {
 		this.address = address;

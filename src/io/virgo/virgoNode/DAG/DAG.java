@@ -1,6 +1,7 @@
 package io.virgo.virgoNode.DAG;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -108,7 +109,6 @@ public class DAG {
 
 			@Override
 			public void run() {
-				
 				Peers.getTips();
 				
 				try {
@@ -161,7 +161,9 @@ public class DAG {
 	
 	
 	public void initTx(JSONObject txJson, boolean saved) throws JSONException, IllegalArgumentException {
-
+		if(txJson.toString().length() > 2048)//java char takes 2 bytes, limit transaction size to 4kb
+			return;
+		
 		JSONArray parents = txJson.getJSONArray("parents");
 		JSONArray outputs = txJson.getJSONArray("outputs");
 		long date = txJson.getLong("date");
@@ -170,10 +172,11 @@ public class DAG {
 		if(txJson.has("parentBeacon")) {
 			
 			String parentBeacon = txJson.getString("parentBeacon");
-			long nonce = txJson.getLong("nonce");
+			String nonce = txJson.getString("nonce");
 		
 			String txUid = Converter.Addressify(Sha256.getDoubleHash((parents.toString() + outputs.toString() + parentBeacon + date + nonce).getBytes()).toBytes(), Main.TX_IDENTIFIER);
 			//Ensure transaction isn't processed yet
+						
 			if(loadedTransactions.containsKey(txUid) || waitingTxsUids.contains(txUid))
 				return;
 			
@@ -184,7 +187,6 @@ public class DAG {
 				else
 					processingTransactions.add(txUid);
 			}
-			
 			initBeaconTx(parents, outputs, parentBeacon, nonce, date, saved);
 			
 		//regular transaction
@@ -194,10 +196,11 @@ public class DAG {
 			JSONArray inputs = txJson.getJSONArray("inputs");
 			
 			String txUid = Converter.Addressify(sigBytes, Main.TX_IDENTIFIER);
+			
 			//Ensure transaction isn't processed yet
 			if(loadedTransactions.containsKey(txUid) || waitingTxsUids.contains(txUid))
 				return;
-			
+
 			//prevent concurrency with synchronized list of processing transactions
 			synchronized(processingTransactions) {
 				if(processingTransactions.contains(txUid))
@@ -211,7 +214,7 @@ public class DAG {
 			
 	}
 	
-	public void initBeaconTx(JSONArray parents, JSONArray outputs, String parentBeacon, long nonce, long date, boolean saved) {
+	public void initBeaconTx(JSONArray parents, JSONArray outputs, String parentBeacon, String nonce, long date, boolean saved) {
 		
 		Sha256Hash txHash = Sha256.getDoubleHash((parents.toString() + outputs.toString() + parentBeacon + date + nonce).getBytes());
 		String txUid = Converter.Addressify(txHash.toBytes(), Main.TX_IDENTIFIER);
@@ -225,7 +228,7 @@ public class DAG {
 			processingTransactions.remove(txUid);
 			return;
 		}
-		
+
 		if(!Utils.validateAddress(parentBeacon, Main.TX_IDENTIFIER) || parents.isEmpty()) {
 			processingTransactions.remove(txUid);
 			throw new IllegalArgumentException("Invalid transaction format");
@@ -246,7 +249,6 @@ public class DAG {
 			processingTransactions.remove(txUid);
 			return;
 		}
-		
 		//Create corresponding Transaction object
 		Transaction tx = new Transaction(txUid,
 				parentsUids.toArray(new String[parentsUids.size()]),
@@ -257,7 +259,6 @@ public class DAG {
 	}
 	
 	void initBeaconTx(Transaction tx) {
-		
 		ArrayList<String> waitedTxs = new ArrayList<String>();
 		
 		//Check for missing parents 
@@ -282,13 +283,11 @@ public class DAG {
 			processingTransactions.remove(tx.getUid());
 			return;
 		}
-		
 		//check if transaction has no useless parent
 		if(loadedParents.size() > 1 && (loadedParents.get(0).isChildOf(loadedParents.get(1)) || loadedParents.get(1).isChildOf(loadedParents.get(0)))) {
 			processingTransactions.remove(tx.getUid());
 			return;
 		}
-		
 		//check if transaction timestamp is superior to last 10 blocks median and inferior to current time + 15 minutes
 		ArrayList<Long> timestamps = new ArrayList<Long>();
 		LoadedTransaction currentParent = parentBeacon;
@@ -309,7 +308,6 @@ public class DAG {
 			processingTransactions.remove(tx.getUid());
 			return;
 		}
-		
 		//check if transaction is effectively child of it's parent beacon
 		boolean childOf = false;
 		for(LoadedTransaction parent : loadedParents)
@@ -322,7 +320,6 @@ public class DAG {
 			processingTransactions.remove(tx.getUid());
 			return;
 		}
-		
 		if(!parentBeacon.getRandomXKey().equals(currentVmKey)) {
 			randomX.changeKey(parentBeacon.getRandomXKey().getBytes());
 			currentVmKey = genesis.getRandomXKey();
@@ -342,10 +339,10 @@ public class DAG {
 			hashPadded[i + 1] = txHash[i];
 		}
 		
-		long hashValue = ByteBuffer.wrap(hashPadded).getLong();
+		BigInteger hashValue = new BigInteger(ByteBuffer.wrap(hashPadded).array());
 		
 		//check if required difficulty is met
-		if(hashValue >= Main.MAX_DIFFICULTY/parentBeacon.getDifficulty()) {
+		if(hashValue.compareTo(Main.MAX_DIFFICULTY.divide(parentBeacon.getDifficulty())) >= 0) {
 			processingTransactions.remove(tx.getUid());
 			return;
 		}
@@ -431,6 +428,7 @@ public class DAG {
 	 * Initiate transaction from Transaction object
 	 */
 	void initTx(Transaction tx) {
+
 		ArrayList<String> waitedTxs = new ArrayList<String>();
 		
 		//Check for missing parents 
@@ -499,7 +497,7 @@ public class DAG {
 			long amount = input.getOutputsMap().get(tx.getAddress()).getAmount();
 			totalInputValue += amount;
 		}
-		
+
 		//Check if inputs contains enough funds to cover outputs
 		if(totalInputValue != tx.getOutputsValue()) {
 			processingTransactions.remove(tx.getUid());
@@ -582,8 +580,11 @@ public class DAG {
 		if(!waitedTxs.containsKey(tx))
 			return;
 		
-		for(OrphanTransaction orphanTx : waitedTxs.get(tx))
-			orphanTx.removeWaitedTx(tx);
+		synchronized(waitedTxs.get(tx)) {
+			for(OrphanTransaction orphanTx : waitedTxs.get(tx))
+				orphanTx.removeWaitedTx(tx);
+		}
+
 		
 		waitedTxs.remove(tx);
 	}
@@ -608,32 +609,33 @@ public class DAG {
 	public LoadedTransaction getBestTipBeacon() {
 		LoadedTransaction selectedBeacon = null;
 		
-		for(LoadedTransaction beacon : childLessBeacons) {
-			if(selectedBeacon == null) {
-				selectedBeacon = beacon;
-				continue;
-			}
-			
-			if(selectedBeacon.getWeight() < beacon.getWeight()) {
-				selectedBeacon = beacon;
-				continue;
-			}
-			
-			if(selectedBeacon.getWeight() == beacon.getWeight()) {
-				if(selectedBeacon.getBeaconHeight() < beacon.getBeaconHeight()) {
+		synchronized(childLessBeacons) {
+			for(LoadedTransaction beacon : childLessBeacons) {
+				if(selectedBeacon == null) {
 					selectedBeacon = beacon;
 					continue;
 				}
 				
-				if(selectedBeacon.getBeaconHeight() == beacon.getBeaconHeight()) {
-					if(selectedBeacon.getDate() > beacon.getDate()) {
+				if(selectedBeacon.getWeight().compareTo(beacon.getWeight()) < 0) {
+					selectedBeacon = beacon;
+					continue;
+				}
+				
+				if(selectedBeacon.getWeight() == beacon.getWeight()) {
+					if(selectedBeacon.getBeaconHeight() < beacon.getBeaconHeight()) {
 						selectedBeacon = beacon;
 						continue;
+					}
+					
+					if(selectedBeacon.getBeaconHeight() == beacon.getBeaconHeight()) {
+						if(selectedBeacon.getDate() > beacon.getDate()) {
+							selectedBeacon = beacon;
+							continue;
+						}
 					}
 				}
 			}
 		}
-		
 		return selectedBeacon;
 	}
 	
@@ -706,30 +708,32 @@ public class DAG {
 		return genesis;
 	}
 	
-	public static long calcDifficulty(ArrayList<Long> targets, ArrayList<Long> solveTimes) {
+	public static BigInteger calcDifficulty(List<BigInteger> targets, List<Long> solveTimes) {
 		
 		int T = 60;
 		int N = 22;
 
-		long sumD = 0;
+		BigInteger sumD = BigInteger.valueOf(0);
 		double sumST = 0;
 		
 		for (long solveTime : solveTimes) { 
-		   sumD += targets.get(solveTimes.indexOf(solveTime)); 
+			sumD = sumD.add(targets.get(solveTimes.indexOf(solveTime))); 
 		   if (solveTime > 7*T) {solveTime = 7*T; }
 		   if (solveTime < -6*T) {solveTime = -6*T; }
 		   sumST += solveTime;
 		}
 		sumST = 0.75*N*T + 0.2523*sumST;
-		return (long) (sumD * T / sumST);
+		return sumD.multiply(BigInteger.valueOf(T)).divide(BigInteger.valueOf((long) sumST));
 		
 	}
 	
 	public ArrayList<String> getTipsUids() {
 		ArrayList<String> uids = new ArrayList<String>();
 		
-		for(LoadedTransaction tip : childLessTxs) {
-			uids.add(tip.getUid());
+		synchronized(childLessTxs) {
+			for(LoadedTransaction tip : childLessTxs) {
+				uids.add(tip.getUid());
+			}
 		}
 		
 		return uids;

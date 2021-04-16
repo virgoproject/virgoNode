@@ -1,8 +1,11 @@
 package io.virgo.virgoNode.DAG;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Stack;
 import java.util.Map.Entry;
 
@@ -17,7 +20,7 @@ public class LoadedTransaction extends Transaction {
 	
 	private DAG dag;
 	
-	LinkedHashMap<BeaconBranch, Long> beaconBranchs = new LinkedHashMap<BeaconBranch, Long>();//branch displacement
+	LinkedHashMap<BeaconBranch, BigInteger> beaconBranchs = new LinkedHashMap<BeaconBranch, BigInteger>();//branch displacement
 	
 	public ArrayList<String> childs = new ArrayList<String>();
 	
@@ -33,15 +36,15 @@ public class LoadedTransaction extends Transaction {
 	private volatile TxStatus status = TxStatus.PENDING;
 	
 	//beacon related variables
-	private long difficulty = 0;
-	private long beaconHeight = 0;
+	private BigInteger difficulty;
+	private long beaconHeight;
 	private LoadedTransaction loadedParentBeacon;
 	public ArrayList<LoadedTransaction> loadedChildBeacons = new ArrayList<LoadedTransaction>();
 	private boolean mainChainMember = false;
 	private boolean confirmedParents = false;
 	private ArrayList<LoadedTransaction> conflictualTxs = new ArrayList<LoadedTransaction>();
-	private ArrayList<Long> solveTimes = new ArrayList<Long>();//solveTimes of the last 22 parent blocks
-	private ArrayList<Long> difficulties = new ArrayList<Long>();//difficulties of the last 22 parent blocks
+	private List<Long> solveTimes = Collections.synchronizedList(new ArrayList<Long>());//solveTimes of the last 22 parent blocks
+	private List<BigInteger> difficulties = Collections.synchronizedList(new ArrayList<BigInteger>());//difficulties of the last 22 parent blocks
 	private String randomX_key = null;
 	private String practical_randomX_key = null;
 	
@@ -94,7 +97,7 @@ public class LoadedTransaction extends Transaction {
 		
 		status = TxStatus.CONFIRMED;
 		
-		difficulty = 10000;
+		difficulty = BigInteger.valueOf(10000);
 		mainChainMember = true;
 		confirmedParents = true;
 		dag.childLessBeacons.add(this);
@@ -111,7 +114,7 @@ public class LoadedTransaction extends Transaction {
 		
 		BeaconBranch beaconBranch = new BeaconBranch();
 		beaconBranch.addTx(this);
-		beaconBranchs.put(beaconBranch, 0l);
+		beaconBranchs.put(beaconBranch, BigInteger.ZERO);
 		
 		dag.getEventListener().notify(new TransactionLoadedEvent(this));
 	}
@@ -134,19 +137,23 @@ public class LoadedTransaction extends Transaction {
 		dag.childLessBeacons.remove(loadedParentBeacon);
 		dag.childLessBeacons.add(this);
 		
-		difficulty = DAG.calcDifficulty(loadedParentBeacon.difficulties, loadedParentBeacon.solveTimes);
+		difficulty = DAG.calcDifficulty(loadedParentBeacon.getDifficulties(), loadedParentBeacon.getSolveTimes());
 		
-		
-		difficulties = loadedParentBeacon.difficulties;
-		solveTimes = loadedParentBeacon.solveTimes;
-		
-		if(difficulties.size() == 22)
-			difficulties.remove(0);
-		difficulties.add(difficulty);
-		
-		if(solveTimes.size() == 22)
-			solveTimes.remove(0);
-		solveTimes.add((getDate()-loadedParentBeacon.getDate())/1000);
+		synchronized(difficulties) {
+			synchronized(solveTimes) {
+				difficulties = loadedParentBeacon.getDifficulties();
+				solveTimes = loadedParentBeacon.getSolveTimes();
+				
+				if(difficulties.size() == 22)
+					difficulties.remove(0);
+				difficulties.add(difficulty);
+				
+				if(solveTimes.size() == 22)
+					solveTimes.remove(0);
+				solveTimes.add((getDate()-loadedParentBeacon.getDate())/1000);
+			}
+		}
+
 		
 		if(beaconHeight % 2048 == 0)
 			randomX_key = getUid();
@@ -196,11 +203,11 @@ public class LoadedTransaction extends Transaction {
 			//create branch
 			BeaconBranch branch = new BeaconBranch();
 			branch.addTx(this);
-			beaconBranchs.put(branch, 0l);
+			beaconBranchs.put(branch, BigInteger.ZERO);
 			
 			//add branch to parent transactions branchs
 			for(LoadedTransaction parentChainMember : loadedParentBeacon.getMainBeaconBranch().getMembersBefore(loadedParentBeacon))
-				parentChainMember.beaconBranchs.put(branch, 0l);
+				parentChainMember.beaconBranchs.put(branch, BigInteger.ZERO);
 		
 		}
 		
@@ -238,12 +245,12 @@ public class LoadedTransaction extends Transaction {
 		if(mainChainBeaconChild == null) {
 			
 			for(LoadedTransaction childBeacon : loadedChildBeacons)
-				if(mainChainBeaconChild == null || mainChainBeaconChild.getWeight() < childBeacon.getWeight())
+				if(mainChainBeaconChild == null || mainChainBeaconChild.getWeight().compareTo(childBeacon.getWeight()) < 0)
 					mainChainBeaconChild = childBeacon;
 			
 			
 			for(LoadedTransaction childBeacon : loadedChildBeacons)
-				if(mainChainBeaconChild != childBeacon && childBeacon.getWeight() == mainChainBeaconChild.getWeight())
+				if(mainChainBeaconChild != childBeacon && childBeacon.getWeight().compareTo(mainChainBeaconChild.getWeight()) == 0)
 					return;
 			
 			for(LoadedTransaction childBeacon : loadedChildBeacons)
@@ -256,14 +263,14 @@ public class LoadedTransaction extends Transaction {
 		} else {
 			
 			for(LoadedTransaction childBeacon : loadedChildBeacons)
-				if(mainChainBeaconChild != childBeacon && childBeacon.getWeight() == mainChainBeaconChild.getWeight()) {
+				if(mainChainBeaconChild != childBeacon && childBeacon.getWeight().compareTo(mainChainBeaconChild.getWeight()) == 0) {
 					mainChainBeaconChild.undoChain();
 					return;
 				}
 			
 			LoadedTransaction biggestChild = mainChainBeaconChild;
 			for(LoadedTransaction childBeacon : loadedChildBeacons)
-				if(biggestChild != childBeacon && biggestChild.getWeight() < childBeacon.getWeight())
+				if(biggestChild != childBeacon && biggestChild.getWeight().compareTo(childBeacon.getWeight()) < 0)
 					biggestChild = childBeacon;
 			
 			if(biggestChild != mainChainBeaconChild) {
@@ -437,7 +444,7 @@ public class LoadedTransaction extends Transaction {
 		
 	}
 	
-	public void addChild(LoadedTransaction child) {
+	synchronized public void addChild(LoadedTransaction child) {
 		childs.add(child.getUid());
 	}
 	
@@ -498,14 +505,14 @@ public class LoadedTransaction extends Transaction {
 		return height;
 	}
 	
-	public long getWeight() {
-		long newWeight = 0;
+	public BigInteger getWeight() {
+		BigInteger newWeight = BigInteger.ZERO;
 
-		for(Entry<BeaconBranch, Long> branchEntry : beaconBranchs.entrySet())
+		for(Entry<BeaconBranch, BigInteger> branchEntry : beaconBranchs.entrySet())
 			if(branchEntry.getKey().equals(getMainBeaconBranch()))
-				newWeight += branchEntry.getKey().getBranchWeight() - branchEntry.getValue();
+				newWeight = newWeight.add(branchEntry.getKey().getBranchWeight().subtract(branchEntry.getValue()));
 			else
-				newWeight += branchEntry.getKey().getFirst().getWeight();
+				newWeight = newWeight.add(branchEntry.getKey().getFirst().getWeight());
 		
 		return newWeight;
 	}
@@ -526,7 +533,7 @@ public class LoadedTransaction extends Transaction {
 			return settlingTransaction.confirmationCount();
 		
 		int confirmations = 0;
-		for(Entry<BeaconBranch, Long> branchEntry : beaconBranchs.entrySet())
+		for(Entry<BeaconBranch, BigInteger> branchEntry : beaconBranchs.entrySet())
 			if(branchEntry.getKey().equals(getMainBeaconBranch()))
 				confirmations += branchEntry.getKey().getBranchConfirmations() - branchEntry.getKey().indexOf(this);
 			else
@@ -539,8 +546,16 @@ public class LoadedTransaction extends Transaction {
 		return settlingTransaction;
 	}
 	
-	public long getDifficulty() {
+	public BigInteger getDifficulty() {
 		return difficulty;
+	}
+	
+	private List<BigInteger> getDifficulties(){	
+		return new ArrayList<BigInteger>(difficulties);
+	}
+	
+	private List<Long> getSolveTimes(){		
+		return new ArrayList<Long>(solveTimes);
 	}
 	
 	public String getRandomXKey() {
