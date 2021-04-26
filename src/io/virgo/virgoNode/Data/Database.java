@@ -95,7 +95,7 @@ public class Database {
     			txJson.put("inputs", new JSONArray(result.getString("inputs")));
     		} else {
     			txJson.put("parentBeacon", parentBeacon);
-    			txJson.put("nonce", result.getLong("nonce"));
+    			txJson.put("nonce", result.getString("nonce"));
     		}
     			
     		txJson.put("outputs", new JSONArray(result.getString("outputs")));
