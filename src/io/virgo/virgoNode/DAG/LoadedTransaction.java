@@ -4,10 +4,14 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Stack;
+import java.util.TreeMap;
 import java.util.Map.Entry;
+import java.util.stream.Collectors;
 
 import io.virgo.virgoNode.DAG.Events.TransactionLoadedEvent;
 import io.virgo.virgoNode.DAG.Events.TransactionStatusChangedEvent;
@@ -215,74 +219,31 @@ public class LoadedTransaction extends Transaction {
 		chooseNextBeacon();
 	}
 	
+	// iterative version
 	private void chooseNextBeacon() {
-		if(!mainChainMember) {
-			loadedParentBeacon.chooseNextBeacon();
-			return;
-		}
 		
-		if(!confirmedParents)
-			confirmParents();
-		
-		if(loadedChildBeacons.size() == 0)
-			return;
-		
-		if(loadedChildBeacons.size() == 1) {
-			loadedChildBeacons.get(0).mainChainMember = true;
-			loadedChildBeacons.get(0).chooseNextBeacon();
-			return;
-		}
-			
 		LoadedTransaction mainChainBeaconChild = null;
+		List<LoadedTransaction> lst = new ArrayList();
+		BigInteger pounds = BigInteger.ZERO;
 		
-		for(LoadedTransaction childBeacon : loadedChildBeacons) {
-			if(childBeacon.mainChainMember) {
-				mainChainBeaconChild = childBeacon;
-				break;
+		for(LoadedTransaction e : loadedChildBeacons){
+			if(e.mainChainMember)
+				mainChainBeaconChild = e;
+			
+			if(e.getWeight().compareTo(pounds) > 0){
+				lst.clear();
+				pounds = e.getWeight();
+				lst.add(e);
 			}
+			else if(e.getWeight().compareTo(pounds) == 0)
+				lst.add(e);
 		}
 		
-		if(mainChainBeaconChild == null) {
-			
-			for(LoadedTransaction childBeacon : loadedChildBeacons)
-				if(mainChainBeaconChild == null || mainChainBeaconChild.getWeight().compareTo(childBeacon.getWeight()) < 0)
-					mainChainBeaconChild = childBeacon;
-			
-			
-			for(LoadedTransaction childBeacon : loadedChildBeacons)
-				if(mainChainBeaconChild != childBeacon && childBeacon.getWeight().compareTo(mainChainBeaconChild.getWeight()) == 0)
-					return;
-			
-			for(LoadedTransaction childBeacon : loadedChildBeacons)
-				if(childBeacon != mainChainBeaconChild)
-					childBeacon.rejectTx();
-			
-			mainChainBeaconChild.mainChainMember = true;
-			mainChainBeaconChild.chooseNextBeacon();
-			
-		} else {
-			
-			for(LoadedTransaction childBeacon : loadedChildBeacons)
-				if(mainChainBeaconChild != childBeacon && childBeacon.getWeight().compareTo(mainChainBeaconChild.getWeight()) == 0) {
-					mainChainBeaconChild.undoChain();
-					return;
-				}
-			
-			LoadedTransaction biggestChild = mainChainBeaconChild;
-			for(LoadedTransaction childBeacon : loadedChildBeacons)
-				if(biggestChild != childBeacon && biggestChild.getWeight().compareTo(childBeacon.getWeight()) < 0)
-					biggestChild = childBeacon;
-			
-			if(biggestChild != mainChainBeaconChild) {
-				mainChainBeaconChild.undoChain();
-				biggestChild.mainChainMember = true;
-				biggestChild.chooseNextBeacon();
-			}
-			
-			for(LoadedTransaction childBeacon : loadedChildBeacons)
-				if(childBeacon != biggestChild)
-					childBeacon.rejectTx();
-		}
+		if(mainChainBeaconChild != null && ( !lst.contains(mainChainBeaconChild) || lst.size() > 1))
+			mainChainBeaconChild.undoChain();
+		
+		if(lst.size() == 1)
+			lst.get(1).confirmTx();
 		
 	}
 	
@@ -315,30 +276,43 @@ public class LoadedTransaction extends Transaction {
 		
 	}
 	
+	// iterative version
 	private void setSettler(LoadedTransaction tx) {
-		if(settlingTransaction != null)
-			return;
 		
+		Stack<LoadedTransaction> s = new Stack();
+		LoadedTransaction tmp;
 		settlingTransaction = tx;
-
-		for(LoadedTransaction inputTx : loadedInputTxs)
-			if(inputTx.getStatus().isRefused() || inputTx.getOutputsMap().get(getAddress()).isSpent())
-				rejectTx();
 		
-		boolean canConfirm = true;
-		for(TxOutput input : loadedInputs)
-			for(LoadedTransaction claimer : input.claimers)
-				if(claimer != this && !claimer.getStatus().isRefused()) {
-					settlingTransaction.conflictualTxs.add(this);
-					canConfirm = false;
+		s.add(this);
+		
+		while(!s.isEmpty()){
+			tmp = s.peek();
+			
+			for(LoadedTransaction inputTx : tmp.loadedInputTxs)
+				if(inputTx.getStatus().isRefused() || inputTx.getOutputsMap().get(getAddress()).isSpent()){
+					tmp.rejectTx();
 					break;
 				}
-		
-		if(canConfirm)
-			confirmTx();
-		
-		for(LoadedTransaction parent : loadedParents)
-			parent.setSettler(tx);
+			
+			boolean canConfirm = true;
+			for(TxOutput input : tmp.loadedInputs)
+				for(LoadedTransaction claimer : input.claimers)
+					if(claimer != this && !claimer.getStatus().isRefused()) {
+						settlingTransaction.conflictualTxs.add(tmp);
+						canConfirm = false;
+						break;
+					}
+			if(canConfirm)
+				tmp.confirmTx();
+			
+			
+			for(LoadedTransaction e : tmp.getLoadedParents()){
+				if(e.settlingTransaction == null){
+					e.settlingTransaction = tx;
+					s.add(e);
+				}
+			}
+		}
 	}
 	
 	private void undoChain() {
@@ -366,16 +340,32 @@ public class LoadedTransaction extends Transaction {
 			mainChainBeaconChild.undoChain();
 	}
 	
+	// iterative version
 	private void removeSettler(LoadedTransaction settler) {
 		if(settlingTransaction != settler)
 			return;
 		
+		LoadedTransaction tmp;
+		Stack<LoadedTransaction> s = new Stack();
+		s.add(this);
+		
 		settlingTransaction = null;
 		changeStatus(TxStatus.PENDING);
 		
-		for(LoadedTransaction parent : loadedParents)
-			parent.removeSettler(settler);
-		
+		while(!s.isEmpty())
+		{
+			tmp = s.peek();
+			
+			for(LoadedTransaction parent : tmp.loadedParents)
+			{
+				if(parent.settlingTransaction != settler)
+					continue;
+				
+				parent.settlingTransaction = null;
+				parent.changeStatus(TxStatus.PENDING);
+				s.add(parent);
+			}
+		}
 	}
 	
 	/**
@@ -421,27 +411,6 @@ public class LoadedTransaction extends Transaction {
 	    }
         
         return false;
-	}
-	
-	public boolean hardIsChildOf(LoadedTransaction target) {
-		
-		if(target == this)
-			return true;
-		
-		if(isGenesis())
-			return false;
-		
-		if(loadedParents.contains(target))
-			return true;
-		
-		for(LoadedTransaction parent : loadedParents) {
-			if(parent.hardIsChildOf(target))
-				return true;
-		}
-
-
-		return false;
-		
 	}
 	
 	synchronized public void addChild(LoadedTransaction child) {
@@ -541,6 +510,8 @@ public class LoadedTransaction extends Transaction {
 		
 		return confirmations;
 	}
+	
+	
 
 	public LoadedTransaction getSettlingTransaction() {
 		return settlingTransaction;
