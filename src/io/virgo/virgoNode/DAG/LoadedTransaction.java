@@ -4,14 +4,10 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Stack;
-import java.util.TreeMap;
 import java.util.Map.Entry;
-import java.util.stream.Collectors;
 
 import io.virgo.virgoNode.DAG.Events.TransactionLoadedEvent;
 import io.virgo.virgoNode.DAG.Events.TransactionStatusChangedEvent;
@@ -219,11 +215,18 @@ public class LoadedTransaction extends Transaction {
 		chooseNextBeacon();
 	}
 	
-	// iterative version
 	private void chooseNextBeacon() {
 		
+		if(!mainChainMember) {
+			loadedParentBeacon.chooseNextBeacon();
+			return;
+		}
+
+		if(!confirmedParents)
+			confirmParents();
+		
 		LoadedTransaction mainChainBeaconChild = null;
-		List<LoadedTransaction> lst = new ArrayList();
+		List<LoadedTransaction> lst = new ArrayList<LoadedTransaction>();
 		BigInteger pounds = BigInteger.ZERO;
 		
 		for(LoadedTransaction e : loadedChildBeacons){
@@ -239,11 +242,20 @@ public class LoadedTransaction extends Transaction {
 				lst.add(e);
 		}
 		
-		if(mainChainBeaconChild != null && ( !lst.contains(mainChainBeaconChild) || lst.size() > 1))
-			mainChainBeaconChild.undoChain();
-		
-		if(lst.size() == 1)
-			lst.get(1).confirmTx();
+	    if (lst.size() == 1 && !((LoadedTransaction)lst.get(0)).equals(mainChainBeaconChild)) {
+	        
+	    	lst.get(0).mainChainMember = true;
+	    	
+	        for (LoadedTransaction e : this.loadedChildBeacons) {
+		          if (e.equals(lst.get(0)))
+		            continue; 
+		          e.undoChain();
+		          e.rejectTx();
+		    } 
+	    	
+	        lst.get(0).chooseNextBeacon();
+	        
+	     }
 		
 	}
 	
@@ -252,7 +264,7 @@ public class LoadedTransaction extends Transaction {
 		confirmTx();
 		
 		for(LoadedTransaction parent : loadedParents)
-			parent.setSettler(this);
+				parent.setSettler(this);
 		
 		for(LoadedTransaction conflictingTransaction : conflictualTxs) {
 			
@@ -260,11 +272,10 @@ public class LoadedTransaction extends Transaction {
 			b:
 			for(TxOutput input : conflictingTransaction.loadedInputs) {
 				for(LoadedTransaction claimer : input.claimers)
-					if(claimer != conflictingTransaction)
-						if(claimer.confirmationCount() >= conflictingTransaction.confirmationCount()) {
-							canConfirm = false;
-							break b;
-						} 
+					if(claimer != conflictingTransaction &&
+					claimer.confirmationCount() >= conflictingTransaction.confirmationCount())
+						canConfirm = false;
+						break b;
 			}
 			
 			if(canConfirm)
@@ -276,17 +287,18 @@ public class LoadedTransaction extends Transaction {
 		
 	}
 	
-	// iterative version
 	private void setSettler(LoadedTransaction tx) {
+	    if (settlingTransaction != null)
+	        return; 
 		
-		Stack<LoadedTransaction> s = new Stack();
+		Stack<LoadedTransaction> s = new Stack<LoadedTransaction>();
 		LoadedTransaction tmp;
 		settlingTransaction = tx;
 		
 		s.add(this);
 		
 		while(!s.isEmpty()){
-			tmp = s.peek();
+			tmp = s.pop();
 			
 			for(LoadedTransaction inputTx : tmp.loadedInputTxs)
 				if(inputTx.getStatus().isRefused() || inputTx.getOutputsMap().get(getAddress()).isSpent()){
@@ -345,8 +357,7 @@ public class LoadedTransaction extends Transaction {
 		if(settlingTransaction != settler)
 			return;
 		
-		LoadedTransaction tmp;
-		Stack<LoadedTransaction> s = new Stack();
+		Stack<LoadedTransaction> s = new Stack<LoadedTransaction>();
 		s.add(this);
 		
 		settlingTransaction = null;
@@ -354,7 +365,7 @@ public class LoadedTransaction extends Transaction {
 		
 		while(!s.isEmpty())
 		{
-			tmp = s.peek();
+			LoadedTransaction tmp = s.pop();
 			
 			for(LoadedTransaction parent : tmp.loadedParents)
 			{
