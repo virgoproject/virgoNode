@@ -8,6 +8,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.DAG.DAG;
 import io.virgo.virgoNode.network.Peers;
@@ -15,7 +16,7 @@ import io.virgo.virgoNode.network.Peers;
 public class TxLoader implements Runnable{
 
 	DAG dag;
-	LinkedBlockingQueue<String> queue = new LinkedBlockingQueue<String>();
+	LinkedBlockingQueue<Sha256Hash> queue = new LinkedBlockingQueue<Sha256Hash>();
 
 	public TxLoader(DAG dag) {
 		this.dag = dag;
@@ -26,7 +27,7 @@ public class TxLoader implements Runnable{
 		while(true) {
 			
 			try {
-				String txUid = queue.take();
+				Sha256Hash txUid = queue.take();
 				try {
 					
 					JSONObject txJSON = Main.getDatabase().getTx(txUid);
@@ -47,13 +48,13 @@ public class TxLoader implements Runnable{
 		}
 	}
 
-	public void push(String tx) {
+	public void push(Sha256Hash tx) {
 		if(!queue.contains(tx) && !dag.isTxWaiting(tx) && !dag.isLoaded(tx))
 			queue.add(tx);
 	}
 	
-	public void push(Collection<String> txs) {
-		for(String tx : txs) {
+	public void push(Collection<Sha256Hash> txs) {
+		for(Sha256Hash tx : txs) {
 			if(!queue.contains(tx) && !dag.isTxWaiting(tx))
 				queue.add(tx);
 		}

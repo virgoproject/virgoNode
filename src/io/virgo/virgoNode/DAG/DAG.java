@@ -42,10 +42,10 @@ import io.virgo.virgoNode.network.Peers;
  */
 public class DAG {
 
-	private List<String> processingTransactions = Collections.synchronizedList(new ArrayList<String>());
-	private ConcurrentHashMap<String, LoadedTransaction> loadedTransactions = new ConcurrentHashMap<String, LoadedTransaction>();
-	ConcurrentHashMap<String, List<OrphanTransaction>> waitedTxs = new ConcurrentHashMap<String, List<OrphanTransaction>>();
-	protected List<String> waitingTxsUids = Collections.synchronizedList(new ArrayList<String>());
+	private List<Sha256Hash> processingTransactions = Collections.synchronizedList(new ArrayList<Sha256Hash>());
+	private ConcurrentHashMap<Sha256Hash, LoadedTransaction> loadedTransactions = new ConcurrentHashMap<Sha256Hash, LoadedTransaction>();
+	ConcurrentHashMap<Sha256Hash, List<OrphanTransaction>> waitedTxs = new ConcurrentHashMap<Sha256Hash, List<OrphanTransaction>>();
+	protected List<Sha256Hash> waitingTxsUids = Collections.synchronizedList(new ArrayList<Sha256Hash>());
 	List<LoadedTransaction> childLessTxs = Collections.synchronizedList(new ArrayList<LoadedTransaction>());
 	List<LoadedTransaction> childLessBeacons = Collections.synchronizedList(new ArrayList<LoadedTransaction>());
 
@@ -74,7 +74,7 @@ public class DAG {
 		(new Thread(eventListener)).start();
 		
 		//Add genesis transaction to DAG
-		TxOutput out = new TxOutput("V2N5tYdd1Cm1xqxQDsY15x9ED8kyAUvjbWv", (long) (100000 * Math.pow(10, Main.DECIMALS)), "", "");
+		TxOutput out = new TxOutput("V2N5tYdd1Cm1xqxQDsY15x9ED8kyAUvjbWv", (long) (100000 * Math.pow(10, Main.DECIMALS)), new Sha256Hash("025a6f04e7047b713aaba7fc5003c8266302918c25d1526507becad795b01f3a"));
 		TxOutput[] genesisOutputs = {out};
 		
 		genesis = new LoadedTransaction(this, genesisOutputs);
@@ -116,8 +116,12 @@ public class DAG {
 				} catch (InterruptedException e) {}
 				
 				if(waitedTxs.size() != 0) {
-					Collection<String> lakingTransactions = new ArrayList<String>(waitedTxs.keySet());
-					lakingTransactions.removeAll(waitingTxsUids);
+					Collection<String> lakingTransactions = new ArrayList<String>();
+					
+					for(Sha256Hash lakingTxHash : waitedTxs.keySet())
+						if(!waitingTxsUids.contains(lakingTxHash))
+							lakingTransactions.add(lakingTxHash.toString());
+					
 					Peers.askTxs(lakingTransactions);
 				}
 			}
@@ -143,10 +147,9 @@ public class DAG {
 			System.out.println("Tips found, restoring DAG");
 			
 			for(int i = 0; i < tips.length(); i++) {
-				String txHash = tips.getJSONObject(i).getString("id");
+				Sha256Hash txHash = new Sha256Hash(tips.getJSONObject(i).getString("id"));
 				
-				if(Miscellaneous.validateAddress(txHash, Main.TX_IDENTIFIER))
-					loader.push(txHash);
+				loader.push(txHash);
 			}
 			
 		} catch (SQLException e) {
@@ -155,7 +158,7 @@ public class DAG {
 		
 	}
 
-	public synchronized LoadedTransaction getLoadedTx(String hash) {
+	public synchronized LoadedTransaction getLoadedTx(Sha256Hash hash) {
 		return loadedTransactions.get(hash);
 	}
 	
@@ -171,10 +174,10 @@ public class DAG {
 		//transaction is a beacon transaction
 		if(txJson.has("parentBeacon")) {
 			
-			String parentBeacon = txJson.getString("parentBeacon");
+			Sha256Hash parentBeacon = new Sha256Hash(txJson.getString("parentBeacon"));
 			String nonce = txJson.getString("nonce");
 		
-			String txUid = Converter.Addressify(Sha256.getDoubleHash((parents.toString() + outputs.toString() + parentBeacon + date + nonce).getBytes()).toBytes(), Main.TX_IDENTIFIER);
+			Sha256Hash txUid = Sha256.getDoubleHash((parents.toString() + outputs.toString() + parentBeacon + date + nonce).getBytes());
 			//Ensure transaction isn't processed yet
 						
 			if(loadedTransactions.containsKey(txUid) || waitingTxsUids.contains(txUid))
@@ -187,7 +190,7 @@ public class DAG {
 				else
 					processingTransactions.add(txUid);
 			}
-			initBeaconTx(parents, outputs, parentBeacon, nonce, date, saved);
+			initBeaconTx(txUid, parents, outputs, parentBeacon, nonce, date, saved);
 			
 		//regular transaction
 		}else {
@@ -195,7 +198,9 @@ public class DAG {
 			byte[] pubKey = Converter.hexToBytes(txJson.getString("pubKey"));
 			JSONArray inputs = txJson.getJSONArray("inputs");
 			
-			String txUid = Converter.Addressify(sigBytes, Main.TX_IDENTIFIER);
+			Sha256Hash txUid = Sha256.getDoubleHash(Converter.concatByteArrays(
+					(parents.toString() + inputs.toString() + outputs.toString()).getBytes(),
+					sigBytes, pubKey, Miscellaneous.longToBytes(date)));
 			
 			//Ensure transaction isn't processed yet
 			if(loadedTransactions.containsKey(txUid) || waitingTxsUids.contains(txUid))
@@ -209,49 +214,46 @@ public class DAG {
 					processingTransactions.add(txUid);
 			}
 			
-			initTx(sigBytes, pubKey, parents, inputs, outputs, date, saved);
+			initTx(txUid, sigBytes, pubKey, parents, inputs, outputs, date, saved);
 		}
 			
 	}
 	
-	public void initBeaconTx(JSONArray parents, JSONArray outputs, String parentBeacon, String nonce, long date, boolean saved) {
-		
-		Sha256Hash txHash = Sha256.getDoubleHash((parents.toString() + outputs.toString() + parentBeacon + date + nonce).getBytes());
-		String txUid = Converter.Addressify(txHash.toBytes(), Main.TX_IDENTIFIER);
-		
+	public void initBeaconTx(Sha256Hash txHash, JSONArray parents, JSONArray outputs, Sha256Hash parentBeacon, String nonce, long date, boolean saved) {
+				
 		JSONArray[] cleanedTx = cleanTx(parents, new JSONArray(), outputs);
 		parents = cleanedTx[0];
 		outputs = cleanedTx[2];
 		
 		//beacon transaction must have only one output
 		if(outputs.length() != 1) {
-			processingTransactions.remove(txUid);
+			processingTransactions.remove(txHash);
 			return;
 		}
 
-		if(!Utils.validateAddress(parentBeacon, Main.TX_IDENTIFIER) || parents.isEmpty()) {
-			processingTransactions.remove(txUid);
+		if(parents.isEmpty()) {
+			processingTransactions.remove(txHash);
 			throw new IllegalArgumentException("Invalid transaction format");
 		}
 		
 		//Convert parents JSON to string array
-		ArrayList<String> parentsUids = new ArrayList<String>();
+		ArrayList<Sha256Hash> parentsUids = new ArrayList<Sha256Hash>();
 		for(int i = 0; i < parents.length(); i++)
-			parentsUids.add(parents.getString(i));
+			parentsUids.add(new Sha256Hash(parents.getString(i)));
 		
 		//Build TxOutput objects for this transaction
 		ArrayList<TxOutput> constructedOutput = new ArrayList<TxOutput>();
 		
-		TxOutput output = TxOutput.fromString(outputs.getString(0), txUid);
+		TxOutput output = TxOutput.fromString(outputs.getString(0), txHash);
 		constructedOutput.add(output);
 		
 		if(output.getAmount() != Main.BEACON_REWARD) {
-			processingTransactions.remove(txUid);
+			processingTransactions.remove(txHash);
 			return;
 		}
 		//Create corresponding Transaction object
-		Transaction tx = new Transaction(txUid,
-				parentsUids.toArray(new String[parentsUids.size()]),
+		Transaction tx = new Transaction(txHash,
+				parentsUids.toArray(new Sha256Hash[parentsUids.size()]),
 				constructedOutput.toArray(new TxOutput[1]),
 				parentBeacon, nonce, date, saved);
 		
@@ -259,11 +261,11 @@ public class DAG {
 	}
 	
 	void initBeaconTx(Transaction tx) {
-		ArrayList<String> waitedTxs = new ArrayList<String>();
+		ArrayList<Sha256Hash> waitedTxs = new ArrayList<Sha256Hash>();
 		
 		//Check for missing parents 
 		ArrayList<LoadedTransaction> loadedParents = new ArrayList<LoadedTransaction>();
-		for(String parentTxUid : tx.getParentsUids()) {
+		for(Sha256Hash parentTxUid : tx.getParentsUids()) {
 			LoadedTransaction parentTx = getLoadedTx(parentTxUid);
 			if(parentTx == null)
 				waitedTxs.add(parentTxUid);
@@ -278,7 +280,7 @@ public class DAG {
 		
 		//if there is any missing transaction (input or parent) try to load them and add this transaction to waiting txs
 		if(!waitedTxs.isEmpty()) {
-			addWaitedTxs(waitedTxs, new OrphanTransaction(tx, waitedTxs.toArray(new String[waitedTxs.size()])));
+			addWaitedTxs(waitedTxs, new OrphanTransaction(tx, waitedTxs.toArray(new Sha256Hash[waitedTxs.size()])));
 			loader.push(waitedTxs);
 			processingTransactions.remove(tx.getUid());
 			return;
@@ -366,9 +368,7 @@ public class DAG {
 	 * Initiate regular transaction from raw data
 	 * Includes checks for data and signature validity 
 	 */
-	public void initTx(byte[] sigBytes, byte[] pubKey, JSONArray parents, JSONArray inputs, JSONArray outputs, long date, boolean saved) throws IllegalArgumentException {
-		
-		String txUid = Converter.Addressify(sigBytes, Main.TX_IDENTIFIER);
+	public void initTx(Sha256Hash txUid, byte[] sigBytes, byte[] pubKey, JSONArray parents, JSONArray inputs, JSONArray outputs, long date, boolean saved) throws IllegalArgumentException {
 		
 		//Remove any useless data from transaction, if there is then transaction will be refused
 		JSONArray[] cleanedTx = cleanTx(parents, inputs, outputs);
@@ -415,9 +415,9 @@ public class DAG {
 		}
 		
 		//Create corresponding Transaction object
-		Transaction tx = new Transaction(pubKey, ECDSASignature.fromByteArray(sigBytes),
-				parentsUids.toArray(new String[parentsUids.size()]),
-				inputsUids.toArray(new String[inputsUids.size()]),
+		Transaction tx = new Transaction(txUid, pubKey, ECDSASignature.fromByteArray(sigBytes),
+				parentsUids.toArray(new Sha256Hash[parentsUids.size()]),
+				inputsUids.toArray(new Sha256Hash[inputsUids.size()]),
 				constructedOutputs.toArray(new TxOutput[constructedOutputs.size()]),
 				date, saved);
 		
@@ -429,11 +429,11 @@ public class DAG {
 	 */
 	void initTx(Transaction tx) {
 
-		ArrayList<String> waitedTxs = new ArrayList<String>();
+		ArrayList<Sha256Hash> waitedTxs = new ArrayList<Sha256Hash>();
 		
 		//Check for missing parents 
 		ArrayList<LoadedTransaction> loadedParents = new ArrayList<LoadedTransaction>();
-		for(String parentTxUid : tx.getParentsUids()) {
+		for(Sha256Hash parentTxUid : tx.getParentsUids()) {
 			LoadedTransaction parentTx = getLoadedTx(parentTxUid);
 			if(parentTx == null)
 				waitedTxs.add(parentTxUid);
@@ -441,11 +441,11 @@ public class DAG {
 				loadedParents.add(parentTx);
 		}
 		
-		String[] inputsUids = tx.getInputsUids();
+		Sha256Hash[] inputsUids = tx.getInputsUids();
 		
 		//check for missing inputs
 		ArrayList<LoadedTransaction> loadedInputs = new ArrayList<LoadedTransaction>();
-		for(String inputTxUid : inputsUids) {
+		for(Sha256Hash inputTxUid : inputsUids) {
 			LoadedTransaction inputTx = getLoadedTx(inputTxUid);
 			if(inputTx == null)
 				waitedTxs.add(inputTxUid);
@@ -455,7 +455,7 @@ public class DAG {
 		
 		//if there is any missing transaction (input or parent) try to load them and add this transaction to waiting txs
 		if(!waitedTxs.isEmpty()) {
-			addWaitedTxs(waitedTxs, new OrphanTransaction(tx, waitedTxs.toArray(new String[waitedTxs.size()])));
+			addWaitedTxs(waitedTxs, new OrphanTransaction(tx, waitedTxs.toArray(new Sha256Hash[waitedTxs.size()])));
 			loader.push(waitedTxs);
 			processingTransactions.remove(tx.getUid());
 			return;
@@ -550,7 +550,7 @@ public class DAG {
 		
 		for(int i = 0; i < outputs.length(); i++) {
 			try {
-				TxOutput output = TxOutput.fromString(outputs.getString(i), "");				
+				TxOutput output = TxOutput.fromString(outputs.getString(i), null);				
 				cleanedOutputs.put(output.toString());
 			}catch(JSONException | ArithmeticException | IllegalArgumentException e) {}
 		}
@@ -561,9 +561,9 @@ public class DAG {
 	/**
 	 * Register that orphanTx is waiting for txs so we try to load it once every txs are loaded
 	 */
-	public synchronized void addWaitedTxs(ArrayList<String> txs, OrphanTransaction orphanTx) {
+	public synchronized void addWaitedTxs(ArrayList<Sha256Hash> txs, OrphanTransaction orphanTx) {
 		
-		for(String tx : txs) {
+		for(Sha256Hash tx : txs) {
 			if(waitedTxs.containsKey(tx))
 				waitedTxs.get(tx).add(orphanTx);
 			else
@@ -576,7 +576,7 @@ public class DAG {
 	/**
 	 * Check if any transaction is waiting for this one and remove it from waited list
 	 */
-	public void removeWaitedTx(String tx) {
+	public void removeWaitedTx(Sha256Hash tx) {
 		if(!waitedTxs.containsKey(tx))
 			return;
 		
@@ -592,8 +592,8 @@ public class DAG {
 	/**
 	 * Get best tips ids to use as parent for a new transaction
 	 */
-	public ArrayList<String> getBestParents() {
-		ArrayList<String> bestParents = new ArrayList<String>();
+	public ArrayList<Sha256Hash> getBestParents() {
+		ArrayList<Sha256Hash> bestParents = new ArrayList<Sha256Hash>();
 		while(bestParents.size() == 0) {//avoid desync probs, there can't be 0 childLess txs
 			if(childLessTxs.size() == 1) {
 				bestParents.add(childLessTxs.get(0).getUid());
@@ -643,7 +643,7 @@ public class DAG {
 	 * @param uid A transaction id
 	 * @return true if the transaction is loaded or is present in database, false otherwise
 	 */
-	public boolean hasTransaction(String uid) {
+	public boolean hasTransaction(Sha256Hash uid) {
 		if(loadedTransactions.containsKey(uid) || waitingTxsUids.contains(uid))
 			return true;
 		
@@ -660,7 +660,7 @@ public class DAG {
 	 * @param uid A transaction ID
 	 * @return The JSON representation of this transaction
 	 */
-	public JSONObject getTxJSON(String uid) {
+	public JSONObject getTxJSON(Sha256Hash uid) {
 		if(loadedTransactions.containsKey(uid)) {
 			return loadedTransactions.get(uid).toJSONObject();
 		}
@@ -679,7 +679,7 @@ public class DAG {
 	 * @param txUid A transaction ID
 	 * @return true if this transaction is waiting for other to load
 	 */
-	public boolean isTxWaiting(String txUid) {
+	public boolean isTxWaiting(Sha256Hash txUid) {
 		return waitingTxsUids.contains(txUid);
 	}
 	
@@ -691,7 +691,7 @@ public class DAG {
 	 * @param txUid A transaction ID
 	 * @return true if transaction is loaded, false otherwise
 	 */
-	public boolean isLoaded(String txUid) {
+	public boolean isLoaded(Sha256Hash txUid) {
 		return loadedTransactions.containsKey(txUid);
 	}
 
@@ -727,8 +727,8 @@ public class DAG {
 		
 	}
 	
-	public ArrayList<String> getTipsUids() {
-		ArrayList<String> uids = new ArrayList<String>();
+	public ArrayList<Sha256Hash> getTipsUids() {
+		ArrayList<Sha256Hash> uids = new ArrayList<Sha256Hash>();
 		
 		synchronized(childLessTxs) {
 			for(LoadedTransaction tip : childLessTxs) {

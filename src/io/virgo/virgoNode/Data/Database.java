@@ -13,11 +13,10 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import io.virgo.virgoCryptoLib.Converter;
-import io.virgo.virgoNode.Main;
+import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.DAG.LoadedTransaction;
 import io.virgo.virgoNode.DAG.Transaction;
 import io.virgo.virgoNode.DAG.TxOutput;
-import io.virgo.virgoNode.Utils.Miscellaneous;
 
 public class Database {
 
@@ -45,7 +44,7 @@ public class Database {
 		
 		PreparedStatement insertStmt = conn.prepareStatement("INSERT OR IGNORE INTO txs (id, sig, pubKey, parents, inputs, outputs, parentBeacon, nonce, date) VALUES (?,?,?,?,?,?,?,?,?)");
     	
-    	insertStmt.setString(1, tx.getUid());
+    	insertStmt.setString(1, tx.getUid().toString());
     	insertStmt.setString(4,  new JSONArray(tx.getParentsUids()).toString());
     	
     	
@@ -65,7 +64,7 @@ public class Database {
 		   outputsJson.put(entry.getValue().toString());
 		insertStmt.setString(6, outputsJson.toString());
     	
-		insertStmt.setString(7, tx.getParentBeaconUid());
+		insertStmt.setString(7, tx.getParentBeaconUid().toString());
 		insertStmt.setString(8, tx.getNonce());
 		insertStmt.setLong(9, tx.getDate());
 		
@@ -73,11 +72,9 @@ public class Database {
 		
 	}
 	
-	public JSONObject getTx(String txId) throws SQLException {
-		if(!Miscellaneous.validateAddress(txId, Main.TX_IDENTIFIER))
-			return null;
+	public JSONObject getTx(Sha256Hash txId) throws SQLException {
 		
-        String sql = "SELECT * FROM txs WHERE id='"+txId+"'";
+        String sql = "SELECT * FROM txs WHERE id='"+txId.toString()+"'";
         
         Statement stmt = conn.createStatement();
         ResultSet result = stmt.executeQuery(sql);
@@ -139,7 +136,7 @@ public class Database {
 			
 			for(LoadedTransaction tip : tips) {
 				PreparedStatement insertTips = conn.prepareStatement("INSERT OR IGNORE INTO tips(id,height) VALUES(?,?)");
-				insertTips.setString(1, tip.getUid());
+				insertTips.setString(1, tip.getUid().toString());
 				insertTips.setLong(2, tip.getHeight());
 				insertTips.execute();
 			}

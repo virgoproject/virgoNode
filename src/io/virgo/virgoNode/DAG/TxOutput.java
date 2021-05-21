@@ -6,23 +6,18 @@ import java.util.Collections;
 import java.util.List;
 
 import io.virgo.virgoCryptoLib.Converter;
+import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.Utils.Miscellaneous;
 
 public class TxOutput {
 
-	private String originTx;
+	private Sha256Hash originTx;
 	private String address;
 	private long amount;
 	public List<LoadedTransaction> claimers = Collections.synchronizedList(new ArrayList<LoadedTransaction>());
 	
-	public TxOutput(String address, long amount, String originTx) {
-		this.address = address;
-		this.amount = amount;
-		this.originTx = originTx;
-	}
-	
-	public TxOutput(String address, long amount, String originTx, String claimedBy) {
+	public TxOutput(String address, long amount, Sha256Hash originTx) {
 		this.address = address;
 		this.amount = amount;
 		this.originTx = originTx;
@@ -37,19 +32,12 @@ public class TxOutput {
 	 * @throws ArithmeticException Given amount is out of range
 	 * @throws IllegalArgumentException Can't build a TxOutput from this string
 	 */
-	public static TxOutput fromString(String inputString, String originTx) throws ArithmeticException, IllegalArgumentException {
+	public static TxOutput fromString(String inputString, Sha256Hash originTx) throws ArithmeticException, IllegalArgumentException {
 		
 		String[] outArgs = inputString.split(",");
 		
-		switch(outArgs.length) {
-		case 2:
-			if(Miscellaneous.validateAddress(outArgs[0], Main.ADDR_IDENTIFIER))
-				return new TxOutput(outArgs[0], Converter.hexToDec(outArgs[1]).longValueExact(), originTx);
-			break;
-		case 3:
-			if(Miscellaneous.validateAddress(outArgs[0], Main.ADDR_IDENTIFIER) && Miscellaneous.validateAddress(outArgs[2], Main.TX_IDENTIFIER))
-				return new TxOutput(outArgs[0], Converter.hexToDec(outArgs[1]).longValueExact(), originTx, outArgs[3]);
-		}
+		if(Miscellaneous.validateAddress(outArgs[0], Main.ADDR_IDENTIFIER))
+			return new TxOutput(outArgs[0], Converter.hexToDec(outArgs[1]).longValueExact(), originTx);
 		
 		throw new IllegalArgumentException("Can't build a TxOutput from this string.");
 	}
@@ -63,7 +51,7 @@ public class TxOutput {
 		
 	}
 	
-	public String getOriginTx() {
+	public Sha256Hash getOriginTx() {
 		return originTx;
 	}
 	
@@ -78,4 +66,5 @@ public class TxOutput {
 		}
 		return false;
 	}
+
 }

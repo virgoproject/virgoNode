@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Stack;
 import java.util.Map.Entry;
 
+import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.DAG.Events.TransactionLoadedEvent;
 import io.virgo.virgoNode.DAG.Events.TransactionStatusChangedEvent;
 
@@ -22,7 +23,7 @@ public class LoadedTransaction extends Transaction {
 	
 	LinkedHashMap<BeaconBranch, BigInteger> beaconBranchs = new LinkedHashMap<BeaconBranch, BigInteger>();//branch displacement
 	
-	public ArrayList<String> childs = new ArrayList<String>();
+	public ArrayList<Sha256Hash> childs = new ArrayList<Sha256Hash>();
 	
 	private ArrayList<LoadedTransaction> loadedParents = new ArrayList<LoadedTransaction>();
 	
@@ -102,8 +103,8 @@ public class LoadedTransaction extends Transaction {
 		confirmedParents = true;
 		dag.childLessBeacons.add(this);
 		
-		randomX_key = getUid();
-		practical_randomX_key = getUid();
+		randomX_key = getUid().toString();
+		practical_randomX_key = getUid().toString();
 		
 		for(int i = 0; i < 22; i++) {
 			difficulties.add(difficulty);
@@ -156,7 +157,7 @@ public class LoadedTransaction extends Transaction {
 
 		
 		if(beaconHeight % 2048 == 0)
-			randomX_key = getUid();
+			randomX_key = getUid().toString();
 		else
 			randomX_key = parentBeacon.randomX_key;
 		

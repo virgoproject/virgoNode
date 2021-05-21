@@ -2,6 +2,7 @@ package io.virgo.virgoNode.Utils;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
+import java.nio.ByteBuffer;
 
 import io.virgo.virgoCryptoLib.Base58;
 import io.virgo.virgoCryptoLib.Exceptions.Base58FormatException;
@@ -56,4 +57,11 @@ public class Miscellaneous {
 	    
 		return true;
 	}
+	
+	public static byte[] longToBytes(long x) {
+	    ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
+	    buffer.putLong(x);
+	    return buffer.array();
+	}
+
 }

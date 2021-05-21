@@ -1,5 +1,6 @@
 package io.virgo.virgoNode.DAG;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -8,22 +9,24 @@ import org.json.JSONObject;
 
 import io.virgo.virgoCryptoLib.Converter;
 import io.virgo.virgoCryptoLib.ECDSASignature;
+import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 
 /**
- * Base transaction object, 'raw' data only
+ * Base transaction object
+ * Independent of ledger state
  */
 public class Transaction {
 	
-	private String uid;
+	private Sha256Hash uid;
 	private String address;
 	private ECDSASignature signature = null;
 	private byte[] pubKey = null;
 	
 	private boolean isGenesis = false;
 	
-	private String[] parentsUid;
-	private String[] inputsUid;
+	private Sha256Hash[] parentsUid;
+	private Sha256Hash[] inputsUid;
 	
 	private LinkedHashMap<String, TxOutput> outputs;
 	
@@ -33,14 +36,13 @@ public class Transaction {
 	private long returnAmount = 0;
 	
 	//beacon transaction related variables
-	private String parentBeaconUid = null;
+	private Sha256Hash parentBeaconUid = null;
 	private String nonce = "";
 	
 	private boolean isSaved;
 	
-	public Transaction(byte[] pubKey, ECDSASignature signature, String[] parentsUid, String[] inputsUid, TxOutput[] outputs, long date, boolean isSaved) {
+	public Transaction(Sha256Hash uid, byte[] pubKey, ECDSASignature signature, Sha256Hash[] parentsUid, Sha256Hash[] inputsUid, TxOutput[] outputs, long date, boolean isSaved) {
 		
-		uid = Converter.Addressify(signature.toByteArray(), Main.TX_IDENTIFIER);
 		address = Converter.Addressify(pubKey, Main.ADDR_IDENTIFIER);
 		
 		this.pubKey = pubKey;
@@ -64,7 +66,7 @@ public class Transaction {
 		
 	}
 	
-	public Transaction(String uid, String[] parentsUid, TxOutput[] outputs, String parentBeaconUid, String nonce, long date, boolean isSaved) {
+	public Transaction(Sha256Hash uid, Sha256Hash[] parentsUid, TxOutput[] outputs, Sha256Hash parentBeaconUid, String nonce, long date, boolean isSaved) {
 		
 		this.uid = uid;
 		address = outputs[0].getAddress();
@@ -92,7 +94,7 @@ public class Transaction {
 	 * genesis constructor
 	 */
 	public Transaction(TxOutput[] outputs) {
-		uid = Converter.Addressify("genesis".getBytes(), Main.TX_IDENTIFIER);
+		uid = new Sha256Hash("025a6f04e7047b713aaba7fc5003c8266302918c25d1526507becad795b01f3a");
 		address = "";
 		
 		this.outputs = new LinkedHashMap<String, TxOutput>();
@@ -107,7 +109,7 @@ public class Transaction {
 		isGenesis = true;
 		returnAmount = 0;
 		
-		parentBeaconUid = "";
+		parentBeaconUid = null;
 		nonce = "";
 		
 	}
@@ -130,7 +132,7 @@ public class Transaction {
 	}
 
 
-	public String getUid() {
+	public Sha256Hash getUid() {
 		return uid;
 	}
 	
@@ -166,17 +168,36 @@ public class Transaction {
 		return outputsValue;
 	}
 	
-	public String[] getParentsUids() {
+	public Sha256Hash[] getParentsHashes() {
 		return parentsUid;
 	}
 	
-	public String[] getInputsUids() {
+	public ArrayList<String> getParentsHashesStrings() {
+		ArrayList<String> hashes = new ArrayList<String>();
+		for(Sha256Hash parentHash : parentsUid)
+			hashes.add(parentHash.toString());
+		
+		return hashes;
+	}
+	
+	public Sha256Hash[] getInputsHashes() {
 		return inputsUid;
 	}
 	
-	public String getParentBeaconUid() {
+	public ArrayList<String> getInputsHashesStrings() {
+		ArrayList<String> hashes = new ArrayList<String>();
+		for(Sha256Hash inputHash : inputsUid)
+			hashes.add(inputHash.toString());
+		
+		return hashes;
+	}
+	
+	public Sha256Hash getParentBeaconHash() {
 		return parentBeaconUid;
 	}
+	
+	
+	
 	
 	public String getNonce() {
 		return nonce;
