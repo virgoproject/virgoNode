@@ -4,6 +4,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import io.virgo.geoWeb.Peer;
+import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 
 public class OnGetTips {
@@ -12,7 +13,13 @@ public class OnGetTips {
 		
 		JSONObject tipsMsg = new JSONObject();	
 		tipsMsg.put("command", "tips");
-		tipsMsg.put("tips", new JSONArray(Main.getDAG().getTipsUids()));
+		
+		JSONArray tips = new JSONArray();
+		
+		for(Sha256Hash txHash : Main.getDAG().getTipsUids())
+			tips.put(txHash.toString());
+		
+		tipsMsg.put("tips", tips);
 		peer.respondToMessage(tipsMsg, messageJson);
 	}
 	

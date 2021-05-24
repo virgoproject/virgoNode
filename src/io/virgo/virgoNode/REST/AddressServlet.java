@@ -1,10 +1,11 @@
 package io.virgo.virgoNode.REST;
 
-import java.util.ArrayList;
+import java.util.List;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.DAG.Infos.AddressInfos;
 
@@ -37,12 +38,15 @@ public class AddressServlet {
 							pages = Math.abs(Integer.parseInt(arguments[3]));
 					}
 					
-					ArrayList<String> transactions = infos.getTransactions();
+					List<Sha256Hash> transactions = infos.getTransactions();
 					JSONArray transactionsJSON = new JSONArray();
 
 					if(transactions.size() != 0)
-						transactionsJSON = new JSONArray(transactions.subList(Math.min((pages-1)*perPage, transactions.size()-1), Math.min(pages*perPage, transactions.size())));
+						transactions = transactions.subList(Math.min((pages-1)*perPage, transactions.size()-1), Math.min(pages*perPage, transactions.size()));
 						
+					for(Sha256Hash txHash : transactions)
+						transactionsJSON.put(txHash.toString());
+					
 					JSONObject response = new JSONObject();
 					response.put("txs", transactionsJSON);
 					response.put("size", transactions.size());
@@ -64,16 +68,18 @@ public class AddressServlet {
 							pages = Math.abs(Integer.parseInt(arguments[3]));
 					}
 					
-					ArrayList<String> inputs = infos.getInputs();
+					List<Sha256Hash> inputs = infos.getInputs();
 					JSONArray inputsJSON = new JSONArray();
 
 					if(inputs.size() != 0)
-						inputsJSON = new JSONArray(inputs.subList(Math.min((pages-1)*perPage, inputs.size()-1), Math.min(pages*perPage, inputs.size())));
+						inputs = inputs.subList(Math.min((pages-1)*perPage, inputs.size()-1), Math.min(pages*perPage, inputs.size()));
+					
+					for(Sha256Hash txHash : inputs)
+						inputsJSON.put(txHash.toString());
 						
 					JSONObject response = new JSONObject();
 					response.put("inputs", inputsJSON);
 					response.put("size", inputs.size());
-					
 					
 					return new Response(200,response.toString());
 					
@@ -92,12 +98,15 @@ public class AddressServlet {
 							pages = Math.abs(Integer.parseInt(arguments[3]));
 					}
 					
-					ArrayList<String> outputs = infos.getOutputs();
+					List<Sha256Hash> outputs = infos.getOutputs();
 					JSONArray outputsJSON = new JSONArray();
 
 					if(outputs.size() != 0)
-						outputsJSON = new JSONArray(outputs.subList(Math.min((pages-1)*perPage, outputs.size()-1), Math.min(pages*perPage, outputs.size())));
+						outputs = outputs.subList(Math.min((pages-1)*perPage, outputs.size()-1), Math.min(pages*perPage, outputs.size()));
 						
+					for(Sha256Hash txHash : outputs)
+						outputsJSON.put(txHash.toString());
+					
 					JSONObject response = new JSONObject();
 					response.put("outputs", outputsJSON);
 					response.put("size", outputs.size());

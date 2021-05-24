@@ -87,7 +87,7 @@ public class DAG {
 		
 		currentVmKey = genesis.getRandomXKey();
 		
-		System.out.println("Genesis TxUid is " + genesis.getHash());
+		System.out.println("Genesis TxUid is " + genesis.getHash().toString());
 				
 		transactionExecutorPool = (ThreadPoolExecutor) Executors.newFixedThreadPool(50);
 		transactionExecutorPool.setKeepAliveTime(600000, TimeUnit.MILLISECONDS);
@@ -194,8 +194,7 @@ public class DAG {
 			JSONArray inputs = txJson.getJSONArray("inputs");
 			
 			Sha256Hash txHash = Sha256.getDoubleHash(Converter.concatByteArrays(
-					(parents.toString() + inputs.toString() + outputs.toString()).getBytes(),
-					sigBytes, pubKey, Miscellaneous.longToBytes(date)));
+					(parents.toString() + inputs.toString() + outputs.toString()).getBytes(), pubKey, Miscellaneous.longToBytes(date)));
 			
 			//Ensure transaction isn't processed yet
 			if(loadedTransactions.containsKey(txHash) || waitingTxsHashes.contains(txHash))
@@ -358,7 +357,7 @@ public class DAG {
 	 * Initiate regular transaction from raw data
 	 * Includes checks for data and signature validity 
 	 */
-	public void initTx(Sha256Hash txUid, byte[] sigBytes, byte[] pubKey, JSONArray parents, JSONArray inputs, JSONArray outputs, long date, boolean saved) throws IllegalArgumentException {
+	public void initTx(Sha256Hash txHash, byte[] sigBytes, byte[] pubKey, JSONArray parents, JSONArray inputs, JSONArray outputs, long date, boolean saved) throws IllegalArgumentException {
 		
 		//Remove any useless data from transaction, if there is then transaction will be refused
 		CleanedTx cleanedTx = cleanTx(parents, inputs, outputs, null);
@@ -368,7 +367,7 @@ public class DAG {
 		
 		//make sure neither inputs or ouputs are empty
 		if(inputsHashes.isEmpty() || constructedOutputs.isEmpty() || parentsHashes.isEmpty()) {
-			processingTransactions.remove(txUid);
+			processingTransactions.remove(txHash);
 			throw new IllegalArgumentException("Invalid transaction format");
 		}
 		
@@ -378,16 +377,15 @@ public class DAG {
 			ECDSA signer = new ECDSA();
 			ECDSASignature sig = ECDSASignature.fromByteArray(sigBytes);
 			
-			Sha256Hash txHash = Sha256.getDoubleHash((parents.toString() + inputs.toString() + outputs.toString() + date).getBytes());
 			if(!signer.Verify(txHash, sig, pubKey)) {
-				processingTransactions.remove(txUid);
+				processingTransactions.remove(txHash);
 				throw new IllegalArgumentException("Invalid signature");
 			}
 			
 		}
 		
 		//Create corresponding Transaction object
-		Transaction tx = new Transaction(txUid, pubKey, ECDSASignature.fromByteArray(sigBytes),
+		Transaction tx = new Transaction(txHash, pubKey, ECDSASignature.fromByteArray(sigBytes),
 				parentsHashes.toArray(new Sha256Hash[parentsHashes.size()]),
 				inputsHashes.toArray(new Sha256Hash[inputsHashes.size()]),
 				constructedOutputs.toArray(new TxOutput[constructedOutputs.size()]),

@@ -15,12 +15,12 @@ public class OnTips {
 		
 		JSONArray tips = messageJson.getJSONArray("tips");
 		
-		ArrayList<String> lakingTxs = new ArrayList<String>();
+		ArrayList<Sha256Hash> lakingTxs = new ArrayList<Sha256Hash>();
 		
 		for(int i = 0; i < tips.length(); i++) {
 			Sha256Hash txHash = new Sha256Hash(tips.getString(i));
 			if(!Main.getDAG().hasTransaction(txHash))
-				lakingTxs.add(tips.getString(i));
+				lakingTxs.add(txHash);
 		}
 		
 		if(lakingTxs.size() != 0)

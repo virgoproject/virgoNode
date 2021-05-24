@@ -40,7 +40,6 @@ public class Main {
 	public static final int DECIMALS = 8;
 	public static final long BEACON_REWARD = (long) (5 * Math.pow(10, DECIMALS));
 	public static final byte[] ADDR_IDENTIFIER = new BigInteger("4039").toByteArray();
-	public static final byte[] TX_IDENTIFIER = new BigInteger("3823").toByteArray();
 	public static final BigInteger MAX_DIFFICULTY = new BigInteger("115792089237316195423570985008687907853269984665640564039457584007913129639935");//value of 0x00000000FFFF0000000000000000000000000000000000000000000000000000
 	
 	//ugly debug stats

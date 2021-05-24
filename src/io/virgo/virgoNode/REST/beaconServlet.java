@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.DAG.LoadedTransaction;
 
@@ -21,7 +22,7 @@ public class beaconServlet {
 					if(arguments.length >= 2)
 						wanted = Math.min(Math.abs(Integer.parseInt(arguments[1])), 100);
 					
-					ArrayList<String> beacons = new ArrayList<String>();
+					ArrayList<Sha256Hash> beacons = new ArrayList<Sha256Hash>();
 					LoadedTransaction currentBeacon = Main.getDAG().getBestTipBeacon().getParentBeacon();
 					for(int i = 0; i < wanted; i++) {
 						beacons.add(currentBeacon.getHash());
@@ -31,7 +32,11 @@ public class beaconServlet {
 						currentBeacon = currentBeacon.getParentBeacon();
 					}
 
-					JSONArray resp = new JSONArray(beacons);
+					JSONArray resp = new JSONArray();
+					
+					for(Sha256Hash beaconHash : beacons)
+						beacons.add(beaconHash);
+					
 					return new Response(200, resp.toString());
 					
 				}catch(NumberFormatException e) {
@@ -40,7 +45,7 @@ public class beaconServlet {
 				
 			}else {
 				
-				LoadedTransaction beacon = Main.getDAG().getLoadedTx(arguments[0]);
+				LoadedTransaction beacon = Main.getDAG().getLoadedTx(new Sha256Hash(arguments[0]));
 				
 				if(!beacon.isBeaconTransaction()) {
 					JSONObject resp = new JSONObject();

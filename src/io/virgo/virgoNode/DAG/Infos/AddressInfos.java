@@ -2,6 +2,7 @@ package io.virgo.virgoNode.DAG.Infos;
 
 import java.util.ArrayList;
 
+import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.DAG.LoadedTransaction;
 import io.virgo.virgoNode.DAG.TxOutput;
 import io.virgo.virgoNode.DAG.TxStatus;
@@ -9,9 +10,9 @@ import io.virgo.virgoNode.DAG.TxStatus;
 public class AddressInfos {
 
 	private String address;
-	private ArrayList<String> inputs = new ArrayList<String>();
-	private ArrayList<String> outputs = new ArrayList<String>();
-	private ArrayList<String> transactions = new ArrayList<String>();
+	private ArrayList<Sha256Hash> inputs = new ArrayList<Sha256Hash>();
+	private ArrayList<Sha256Hash> outputs = new ArrayList<Sha256Hash>();
+	private ArrayList<Sha256Hash> transactions = new ArrayList<Sha256Hash>();
 	
 	private long totalReceived = 0;
 	private long totalSent = 0;
@@ -121,16 +122,16 @@ public class AddressInfos {
 		return totalSent;
 	}
 
-	public ArrayList<String> getTransactions() {
-		return new ArrayList<String>(transactions);
+	public ArrayList<Sha256Hash> getTransactions() {
+		return new ArrayList<Sha256Hash>(transactions);
 	}
 	
-	public ArrayList<String> getInputs() {
-		return new ArrayList<String>(inputs);
+	public ArrayList<Sha256Hash> getInputs() {
+		return new ArrayList<Sha256Hash>(inputs);
 	}
 	
-	public ArrayList<String> getOutputs() {
-		return new ArrayList<String>(outputs);
+	public ArrayList<Sha256Hash> getOutputs() {
+		return new ArrayList<Sha256Hash>(outputs);
 	}
 	
 }
