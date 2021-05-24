@@ -27,7 +27,7 @@ public class OrphanTransaction extends Transaction {
 		
 		//if no more transaction to wait load this transaction to DAG
 		if(waitedTxs.size() == 0) {
-			Main.getDAG().waitingTxsUids.remove(getUid());
+			Main.getDAG().waitingTxsHashes.remove(getHash());
 			Main.getDAG().transactionExecutorPool.submit(new AddTransactionTask(this));
 		}
 	}

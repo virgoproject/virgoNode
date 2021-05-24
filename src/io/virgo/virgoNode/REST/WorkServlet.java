@@ -12,7 +12,7 @@ public class WorkServlet {
 		LoadedTransaction bestParentBeacon = Main.getDAG().getBestTipBeacon();
 		
 		JSONObject response = new JSONObject();
-		response.put("parentBeacon", bestParentBeacon.getUid());
+		response.put("parentBeacon", bestParentBeacon.getHash());
 		response.put("difficulty", bestParentBeacon.getDifficulty().toString());
 		response.put("key", bestParentBeacon.getRandomXKey());
 		

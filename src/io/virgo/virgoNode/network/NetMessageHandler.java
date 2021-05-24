@@ -63,9 +63,7 @@ public class NetMessageHandler extends MessageHandler {
 					OnGetPoWInformations.handle(messageJson, peer);
 			}
 			
-		}catch(JSONException e) {
-			System.out.println(e.getMessage());
-		}
+		}catch(JSONException|IllegalArgumentException e) {}
 	}
 	
 }

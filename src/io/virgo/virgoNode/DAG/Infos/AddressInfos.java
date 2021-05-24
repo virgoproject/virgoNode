@@ -27,7 +27,7 @@ public class AddressInfos {
 	 */
 	public void addTx(LoadedTransaction tx) {
 		
-		if(transactions.contains(tx.getUid()))
+		if(transactions.contains(tx.getHash()))
 			return;
 
 		//calculate this transaction's impact on the address balance
@@ -35,18 +35,18 @@ public class AddressInfos {
 		
 		if(tx.getAddress().equals(getAddress())){
 			total -= tx.getTotalInput();
-			outputs.add(0, tx.getUid());
+			outputs.add(0, tx.getHash());
 		}
 		
 		//get the return output and add it to total, also add tx to inputs because there is something to spend on it
 		TxOutput input = tx.getOutputsMap().get(getAddress());
 		if(input != null){
 			total += input.getAmount();
-			inputs.add(0, tx.getUid());
+			inputs.add(0, tx.getHash());
 		}
 		
 		if(total != 0)
-			transactions.add(0, tx.getUid());
+			transactions.add(0, tx.getHash());
 		
 		//this transaction had something to do with this address
 		if(total > 0)
@@ -61,7 +61,7 @@ public class AddressInfos {
 	}
 	
 	public void updateTx(LoadedTransaction tx, TxStatus newStatus, TxStatus formerStatus) {
-		if(!transactions.contains(tx.getUid()))
+		if(!transactions.contains(tx.getHash()))
 			return;
 		
 		long total = 0;

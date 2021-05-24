@@ -24,7 +24,7 @@ public class beaconServlet {
 					ArrayList<String> beacons = new ArrayList<String>();
 					LoadedTransaction currentBeacon = Main.getDAG().getBestTipBeacon().getParentBeacon();
 					for(int i = 0; i < wanted; i++) {
-						beacons.add(currentBeacon.getUid());
+						beacons.add(currentBeacon.getHash());
 						if(currentBeacon.getParentBeacon() == null)
 							break;
 						
@@ -50,7 +50,7 @@ public class beaconServlet {
 				}
 				
 				JSONObject response = new JSONObject();
-				response.put("parentBeacon", beacon.getParentBeacon().getUid());
+				response.put("parentBeacon", beacon.getParentBeacon().getHash());
 				response.put("height", beacon.getBeaconHeight());
 				response.put("difficulty", beacon.getDifficulty());
 				response.put("isMainChainMember", beacon.isMainChainMember());

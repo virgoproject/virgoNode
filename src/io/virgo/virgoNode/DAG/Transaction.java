@@ -18,15 +18,15 @@ import io.virgo.virgoNode.Main;
  */
 public class Transaction {
 	
-	private Sha256Hash uid;
+	private Sha256Hash hash;
 	private String address;
 	private ECDSASignature signature = null;
 	private byte[] pubKey = null;
 	
 	private boolean isGenesis = false;
 	
-	private Sha256Hash[] parentsUid;
-	private Sha256Hash[] inputsUid;
+	private Sha256Hash[] parentsHashes;
+	private Sha256Hash[] inputsHashes;
 	
 	private LinkedHashMap<String, TxOutput> outputs;
 	
@@ -36,19 +36,19 @@ public class Transaction {
 	private long returnAmount = 0;
 	
 	//beacon transaction related variables
-	private Sha256Hash parentBeaconUid = null;
+	private Sha256Hash parentBeaconHash = null;
 	private String nonce = "";
 	
 	private boolean isSaved;
 	
-	public Transaction(Sha256Hash uid, byte[] pubKey, ECDSASignature signature, Sha256Hash[] parentsUid, Sha256Hash[] inputsUid, TxOutput[] outputs, long date, boolean isSaved) {
+	public Transaction(Sha256Hash uid, byte[] pubKey, ECDSASignature signature, Sha256Hash[] parentsHashes, Sha256Hash[] inputsHashes, TxOutput[] outputs, long date, boolean isSaved) {
 		
 		address = Converter.Addressify(pubKey, Main.ADDR_IDENTIFIER);
 		
 		this.pubKey = pubKey;
 		this.signature = signature;
-		this.parentsUid = parentsUid;
-		this.inputsUid = inputsUid;
+		this.parentsHashes = parentsHashes;
+		this.inputsHashes = inputsHashes;
 		this.isSaved = isSaved;
 		
 		this.outputs = new LinkedHashMap<String, TxOutput>();
@@ -66,19 +66,19 @@ public class Transaction {
 		
 	}
 	
-	public Transaction(Sha256Hash uid, Sha256Hash[] parentsUid, TxOutput[] outputs, Sha256Hash parentBeaconUid, String nonce, long date, boolean isSaved) {
+	public Transaction(Sha256Hash hash, Sha256Hash[] parentsHashes, TxOutput[] outputs, Sha256Hash parentBeaconHash, String nonce, long date, boolean isSaved) {
 		
-		this.uid = uid;
+		this.hash = hash;
 		address = outputs[0].getAddress();
 		
 		this.pubKey = null;
 		this.signature = null;
-		this.parentsUid = parentsUid;
+		this.parentsHashes = parentsHashes;
 		this.isSaved = isSaved;
 		
 		this.outputs = new LinkedHashMap<String, TxOutput>();
 		
-		this.parentBeaconUid = parentBeaconUid;
+		this.parentBeaconHash = parentBeaconHash;
 		this.nonce = nonce;
 		
 		this.date = date;
@@ -94,7 +94,7 @@ public class Transaction {
 	 * genesis constructor
 	 */
 	public Transaction(TxOutput[] outputs) {
-		uid = new Sha256Hash("025a6f04e7047b713aaba7fc5003c8266302918c25d1526507becad795b01f3a");
+		hash = new Sha256Hash("025a6f04e7047b713aaba7fc5003c8266302918c25d1526507becad795b01f3a");
 		address = "";
 		
 		this.outputs = new LinkedHashMap<String, TxOutput>();
@@ -109,7 +109,7 @@ public class Transaction {
 		isGenesis = true;
 		returnAmount = 0;
 		
-		parentBeaconUid = null;
+		parentBeaconHash = null;
 		nonce = "";
 		
 	}
@@ -117,23 +117,23 @@ public class Transaction {
 	public Transaction(Transaction baseTransaction) {
 		this.pubKey = baseTransaction.getPublicKey();
 		this.signature = baseTransaction.getSignature();
-		this.parentsUid = baseTransaction.getParentsUids();
-		this.inputsUid = baseTransaction.getInputsUids();
+		this.parentsHashes = baseTransaction.getParentsHashes();
+		this.inputsHashes = baseTransaction.getInputsHashes();
 		this.isSaved = baseTransaction.isSaved();
 		this.outputs = baseTransaction.getOutputsMap();
 		this.date = baseTransaction.getDate();
 		this.outputsValue = baseTransaction.getOutputsValue();
 		this.returnAmount = baseTransaction.getReturnAmount();
-		this.uid = baseTransaction.getUid();
+		this.hash = baseTransaction.getHash();
 		this.address = baseTransaction.getAddress();
 		this.isGenesis = baseTransaction.isGenesis();
-		this.parentBeaconUid = baseTransaction.getParentBeaconUid();
+		this.parentBeaconHash = baseTransaction.getParentBeaconHash();
 		this.nonce = baseTransaction.getNonce();
 	}
 
 
-	public Sha256Hash getUid() {
-		return uid;
+	public Sha256Hash getHash() {
+		return hash;
 	}
 	
 	public String getAddress() {
@@ -157,7 +157,7 @@ public class Transaction {
 	}
 	
 	public boolean isBeaconTransaction() {
-		return parentBeaconUid != null;
+		return parentBeaconHash != null;
 	}
 	
 	public long getReturnAmount() {
@@ -169,35 +169,36 @@ public class Transaction {
 	}
 	
 	public Sha256Hash[] getParentsHashes() {
-		return parentsUid;
+		return parentsHashes;
 	}
 	
 	public ArrayList<String> getParentsHashesStrings() {
 		ArrayList<String> hashes = new ArrayList<String>();
-		for(Sha256Hash parentHash : parentsUid)
+		for(Sha256Hash parentHash : parentsHashes)
 			hashes.add(parentHash.toString());
 		
 		return hashes;
 	}
 	
 	public Sha256Hash[] getInputsHashes() {
-		return inputsUid;
+		return inputsHashes;
 	}
 	
 	public ArrayList<String> getInputsHashesStrings() {
 		ArrayList<String> hashes = new ArrayList<String>();
-		for(Sha256Hash inputHash : inputsUid)
+		for(Sha256Hash inputHash : inputsHashes)
 			hashes.add(inputHash.toString());
 		
 		return hashes;
 	}
 	
 	public Sha256Hash getParentBeaconHash() {
-		return parentBeaconUid;
+		return parentBeaconHash;
 	}
 	
-	
-	
+	public String getParentBeaconHashString() {
+		return parentBeaconHash.toString();
+	}
 	
 	public String getNonce() {
 		return nonce;
@@ -216,14 +217,14 @@ public class Transaction {
 	 */
 	public JSONObject toJSONObject() {
 		JSONObject txJson = new JSONObject();
-		txJson.put("parents", new JSONArray(getParentsUids()));
+		txJson.put("parents", new JSONArray(getParentsHashesStrings()));
 		
 		if(!isBeaconTransaction()) {
 			txJson.put("sig", getSignature().toHexString());
 			txJson.put("pubKey", Converter.bytesToHex(getPublicKey()));
-			txJson.put("inputs", new JSONArray(getInputsUids()));
+			txJson.put("inputs", new JSONArray(getInputsHashesStrings()));
 		} else {
-			txJson.put("parentBeacon", getParentBeaconUid());
+			txJson.put("parentBeacon", getParentBeaconHashString());
 			txJson.put("nonce", getNonce());
 		}
 		

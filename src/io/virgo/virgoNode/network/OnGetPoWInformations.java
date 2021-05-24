@@ -4,6 +4,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import io.virgo.geoWeb.Peer;
+import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.DAG.LoadedTransaction;
 
@@ -14,13 +15,13 @@ public class OnGetPoWInformations {
 		
 		JSONObject resp = new JSONObject();
 		resp.put("command", "PoWInformations");
-		resp.put("parentBeacon", bestParentBeacon.getUid());
+		resp.put("parentBeacon", bestParentBeacon.getHash());
 		resp.put("difficulty", bestParentBeacon.getDifficulty().toString());
 		resp.put("key", bestParentBeacon.getRandomXKey());
 		
 		JSONArray parentTxs = new JSONArray();
-		for(String parent : Main.getDAG().getBestParents())
-			parentTxs.put(parent);
+		for(Sha256Hash parent : Main.getDAG().getBestParents())
+			parentTxs.put(parent.toString());
 			
 		resp.put("parentTxs", parentTxs);
 		

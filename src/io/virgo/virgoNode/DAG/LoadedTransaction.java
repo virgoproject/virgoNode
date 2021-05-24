@@ -103,8 +103,8 @@ public class LoadedTransaction extends Transaction {
 		confirmedParents = true;
 		dag.childLessBeacons.add(this);
 		
-		randomX_key = getUid().toString();
-		practical_randomX_key = getUid().toString();
+		randomX_key = getHash().toString();
+		practical_randomX_key = getHash().toString();
 		
 		for(int i = 0; i < 22; i++) {
 			difficulties.add(difficulty);
@@ -157,7 +157,7 @@ public class LoadedTransaction extends Transaction {
 
 		
 		if(beaconHeight % 2048 == 0)
-			randomX_key = getUid().toString();
+			randomX_key = getHash().toString();
 		else
 			randomX_key = parentBeacon.randomX_key;
 		
@@ -426,7 +426,7 @@ public class LoadedTransaction extends Transaction {
 	}
 	
 	synchronized public void addChild(LoadedTransaction child) {
-		childs.add(child.getUid());
+		childs.add(child.getHash());
 	}
 	
 	private void changeStatus(TxStatus newStatus) {

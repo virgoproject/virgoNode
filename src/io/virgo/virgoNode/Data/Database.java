@@ -44,14 +44,14 @@ public class Database {
 		
 		PreparedStatement insertStmt = conn.prepareStatement("INSERT OR IGNORE INTO txs (id, sig, pubKey, parents, inputs, outputs, parentBeacon, nonce, date) VALUES (?,?,?,?,?,?,?,?,?)");
     	
-    	insertStmt.setString(1, tx.getUid().toString());
-    	insertStmt.setString(4,  new JSONArray(tx.getParentsUids()).toString());
+    	insertStmt.setString(1, tx.getHash().toString());
+    	insertStmt.setString(4,  new JSONArray(tx.getParentsHashesStrings()).toString());
     	
     	
-    	if(tx.getParentBeaconUid() == null) {
+    	if(tx.getParentBeaconHash() == null) {
         	insertStmt.setBytes(2, tx.getSignature().toByteArray());
         	insertStmt.setBytes(3, tx.getPublicKey());
-    		insertStmt.setString(5,  new JSONArray(tx.getInputsUids()).toString());
+    		insertStmt.setString(5,  new JSONArray(tx.getInputsHashesStrings()).toString());
     	} else {
     		insertStmt.setBytes(2, null);
     		insertStmt.setBytes(3, null);
@@ -64,7 +64,7 @@ public class Database {
 		   outputsJson.put(entry.getValue().toString());
 		insertStmt.setString(6, outputsJson.toString());
     	
-		insertStmt.setString(7, tx.getParentBeaconUid().toString());
+		insertStmt.setString(7, tx.getParentBeaconHashString());
 		insertStmt.setString(8, tx.getNonce());
 		insertStmt.setLong(9, tx.getDate());
 		
@@ -136,7 +136,7 @@ public class Database {
 			
 			for(LoadedTransaction tip : tips) {
 				PreparedStatement insertTips = conn.prepareStatement("INSERT OR IGNORE INTO tips(id,height) VALUES(?,?)");
-				insertTips.setString(1, tip.getUid().toString());
+				insertTips.setString(1, tip.getHash().toString());
 				insertTips.setLong(2, tip.getHeight());
 				insertTips.execute();
 			}

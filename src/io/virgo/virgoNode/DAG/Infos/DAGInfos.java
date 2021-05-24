@@ -39,7 +39,7 @@ public class DAGInfos {
 		if(latestTransactions.size() >= 100)
 			latestTransactions.remove(0);
 		
-		latestTransactions.add(transaction.getUid());
+		latestTransactions.add(transaction.getHash());
 		
 	}
 	

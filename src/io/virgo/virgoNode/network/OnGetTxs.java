@@ -4,6 +4,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import io.virgo.geoWeb.Peer;
+import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 
 public class OnGetTxs {
@@ -14,7 +15,7 @@ public class OnGetTxs {
 		JSONArray foundTxs = new JSONArray();
 		
 		for(int i = 0; i < askedTxs.length(); i++) {
-			JSONObject txJSON = Main.getDAG().getTxJSON(askedTxs.getString(i));
+			JSONObject txJSON = Main.getDAG().getTxJSON(new Sha256Hash(askedTxs.getString(i)));
 			if(txJSON != null)
 				foundTxs.put(txJSON);
 		}

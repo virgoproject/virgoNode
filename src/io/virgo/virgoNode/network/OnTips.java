@@ -6,6 +6,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import io.virgo.geoWeb.Peer;
+import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 
 public class OnTips {
@@ -17,9 +18,9 @@ public class OnTips {
 		ArrayList<String> lakingTxs = new ArrayList<String>();
 		
 		for(int i = 0; i < tips.length(); i++) {
-			String tx = tips.getString(i);
-			if(!Main.getDAG().hasTransaction(tx))
-				lakingTxs.add(tx);
+			Sha256Hash txHash = new Sha256Hash(tips.getString(i));
+			if(!Main.getDAG().hasTransaction(txHash))
+				lakingTxs.add(tips.getString(i));
 		}
 		
 		if(lakingTxs.size() != 0)

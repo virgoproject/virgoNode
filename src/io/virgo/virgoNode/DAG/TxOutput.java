@@ -36,8 +36,10 @@ public class TxOutput {
 		
 		String[] outArgs = inputString.split(",");
 		
-		if(Miscellaneous.validateAddress(outArgs[0], Main.ADDR_IDENTIFIER))
-			return new TxOutput(outArgs[0], Converter.hexToDec(outArgs[1]).longValueExact(), originTx);
+		long value = Converter.hexToDec(outArgs[1]).longValueExact();
+		
+		if(Miscellaneous.validateAddress(outArgs[0], Main.ADDR_IDENTIFIER) && value > 0)
+			return new TxOutput(outArgs[0], value, originTx);
 		
 		throw new IllegalArgumentException("Can't build a TxOutput from this string.");
 	}

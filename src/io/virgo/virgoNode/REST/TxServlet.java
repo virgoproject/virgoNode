@@ -64,7 +64,7 @@ public class TxServlet {
 						LoadedTransaction settler = tx.getSettlingTransaction();
 						
 						if(settler != null)
-							txState.put("beacon", settler.getUid());
+							txState.put("beacon", settler.getHash());
 						else
 							txState.put("beacon", "");
 						
@@ -81,7 +81,7 @@ public class TxServlet {
 							
 							for(LoadedTransaction claimer : out.claimers) {
 								JSONObject outClaimer = new JSONObject();
-								outClaimer.put("id", claimer.getUid());
+								outClaimer.put("id", claimer.getHash());
 								outClaimer.put("status", claimer.getStatus().getCode());
 								outClaimers.put(outClaimer);
 							}
