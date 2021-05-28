@@ -10,6 +10,7 @@ import io.virgo.virgoCryptoLib.Converter;
 import io.virgo.virgoCryptoLib.Sha256;
 import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
+import io.virgo.virgoNode.DAG.TxVerificationPool.jsonVerificationTask;
 import io.virgo.virgoNode.Utils.Miscellaneous;
 
 public class OnTxs {
@@ -43,7 +44,7 @@ public class OnTxs {
 			
 
 			try {
-				Main.getDAG().initTx(txJson, false);
+				Main.getDAG().verificationPool. new jsonVerificationTask(txJson, false);
 				
 				if(messageJson.has("callback")) {
 					JSONObject txCallback = new JSONObject();	

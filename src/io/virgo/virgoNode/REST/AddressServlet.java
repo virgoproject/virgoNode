@@ -39,6 +39,8 @@ public class AddressServlet {
 					}
 					
 					List<Sha256Hash> transactions = infos.getTransactions();
+					int transactionsSize = transactions.size();//total address transaction count
+					
 					JSONArray transactionsJSON = new JSONArray();
 
 					if(transactions.size() != 0)
@@ -49,7 +51,7 @@ public class AddressServlet {
 					
 					JSONObject response = new JSONObject();
 					response.put("txs", transactionsJSON);
-					response.put("size", transactions.size());
+					response.put("size", transactionsSize);
 					
 					return new Response(200,response.toString());
 					

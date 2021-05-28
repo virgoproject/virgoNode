@@ -4,12 +4,11 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import io.virgo.virgoCryptoLib.Converter;
-import io.virgo.virgoCryptoLib.Sha256;
 import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.DAG.LoadedTransaction;
 import io.virgo.virgoNode.DAG.TxOutput;
+import io.virgo.virgoNode.DAG.TxVerificationPool.jsonVerificationTask;
 
 public class TxServlet {
 
@@ -128,7 +127,7 @@ public class TxServlet {
 	public static Response POST(String[] arguments, String requestBody) {
 		try {
 			JSONObject txJSON = new JSONObject(requestBody);
-			Main.getDAG().initTx(txJSON, false);
+			Main.getDAG().verificationPool. new jsonVerificationTask(txJSON, false);
 			return new Response(200, "");
 		}catch(JSONException|IllegalArgumentException e) {
 			return new Response(405, "");

@@ -33,7 +33,7 @@ public class TxLoader implements Runnable{
 					JSONObject txJSON = Main.getDatabase().getTx(txUid);
 					
 					if(txJSON != null)
-						dag.initTx(txJSON, true);
+						dag.verificationPool. new jsonVerificationTask(txJSON, true);
 					else throw new JSONException("");
 					
 				} catch (JSONException | SQLException | IllegalArgumentException e) {

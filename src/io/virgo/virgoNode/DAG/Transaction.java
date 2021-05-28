@@ -37,12 +37,13 @@ public class Transaction {
 	
 	//beacon transaction related variables
 	private Sha256Hash parentBeaconHash = null;
-	private String nonce = "";
+	private byte[] nonce = null;
 	
 	private boolean isSaved;
 	
-	public Transaction(Sha256Hash uid, byte[] pubKey, ECDSASignature signature, Sha256Hash[] parentsHashes, Sha256Hash[] inputsHashes, TxOutput[] outputs, long date, boolean isSaved) {
+	public Transaction(Sha256Hash hash, byte[] pubKey, ECDSASignature signature, Sha256Hash[] parentsHashes, Sha256Hash[] inputsHashes, TxOutput[] outputs, long date, boolean isSaved) {
 		
+		this.hash = hash;
 		address = Converter.Addressify(pubKey, Main.ADDR_IDENTIFIER);
 		
 		this.pubKey = pubKey;
@@ -66,7 +67,7 @@ public class Transaction {
 		
 	}
 	
-	public Transaction(Sha256Hash hash, Sha256Hash[] parentsHashes, TxOutput[] outputs, Sha256Hash parentBeaconHash, String nonce, long date, boolean isSaved) {
+	public Transaction(Sha256Hash hash, Sha256Hash[] parentsHashes, TxOutput[] outputs, Sha256Hash parentBeaconHash, byte[] nonce, long date, boolean isSaved) {
 		
 		this.hash = hash;
 		address = outputs[0].getAddress();
@@ -110,7 +111,7 @@ public class Transaction {
 		returnAmount = 0;
 		
 		parentBeaconHash = null;
-		nonce = "";
+		nonce = null;
 		
 	}
 	
@@ -197,10 +198,12 @@ public class Transaction {
 	}
 	
 	public String getParentBeaconHashString() {
-		return parentBeaconHash.toString();
+		if(parentBeaconHash != null)
+			return parentBeaconHash.toString();
+		return null;
 	}
 	
-	public String getNonce() {
+	public byte[] getNonce() {
 		return nonce;
 	}
 	
@@ -225,7 +228,7 @@ public class Transaction {
 			txJson.put("inputs", new JSONArray(getInputsHashesStrings()));
 		} else {
 			txJson.put("parentBeacon", getParentBeaconHashString());
-			txJson.put("nonce", getNonce());
+			txJson.put("nonce", Converter.bytesToHex(getNonce()));
 		}
 		
 		JSONArray outputsJson = new JSONArray();

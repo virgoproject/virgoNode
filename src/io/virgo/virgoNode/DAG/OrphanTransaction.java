@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 
 import io.virgo.virgoCryptoLib.Sha256Hash;
-import io.virgo.virgoNode.Main;
 
 /**
  * Transaction waiting for parents or inputs to be loaded
@@ -22,13 +21,13 @@ public class OrphanTransaction extends Transaction {
 	/**
 	 * Called when a transaction we where waiting for is loaded
 	 */
-	public void removeWaitedTx(Sha256Hash tx) {
+	public void removeWaitedTx(Sha256Hash tx, DAG dag) {
 		waitedTxs.remove(tx);
 		
 		//if no more transaction to wait load this transaction to DAG
 		if(waitedTxs.size() == 0) {
-			Main.getDAG().waitingTxsHashes.remove(getHash());
-			Main.getDAG().transactionExecutorPool.submit(new AddTransactionTask(this));
+			dag.waitingTxsHashes.remove(getHash());
+			dag.queue.add(dag.new txTask(this));
 		}
 	}
 }

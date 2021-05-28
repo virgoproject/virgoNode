@@ -12,8 +12,8 @@ public class NodeInfosServlet {
 		nodeInfosResp.put("appName", Main.getAppName());
 		nodeInfosResp.put("netID", Main.getNetID());
 		nodeInfosResp.put("BeaconChainWeight", Main.getDAG().getGenesis().getWeight());
-		nodeInfosResp.put("BeaconChainHeight", Main.getDAG().getBestTipBeacon().getBeaconHeight());
-		nodeInfosResp.put("DAGHeight", Main.getDAG().getLoadedTx(Main.getDAG().getTipsUids().get(0)).getHeight());
+		nodeInfosResp.put("BeaconChainHeight", Main.getDAG().getBestTipBeacon().getBeaconHeight()+1);
+		nodeInfosResp.put("DAGHeight", Main.getDAG().getLoadedTx(Main.getDAG().getTipsUids().get(0)).getHeight()+1);
 		nodeInfosResp.put("DAGSize", Main.getDAG().loadedTxsCount());
 		
 		return new Response(200, nodeInfosResp.toString());

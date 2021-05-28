@@ -46,8 +46,8 @@ public class LoadedTransaction extends Transaction {
 	private ArrayList<LoadedTransaction> conflictualTxs = new ArrayList<LoadedTransaction>();
 	private List<Long> solveTimes = Collections.synchronizedList(new ArrayList<Long>());//solveTimes of the last 22 parent blocks
 	private List<BigInteger> difficulties = Collections.synchronizedList(new ArrayList<BigInteger>());//difficulties of the last 22 parent blocks
-	private String randomX_key = null;
-	private String practical_randomX_key = null;
+	private Sha256Hash randomX_key = null;
+	private Sha256Hash practical_randomX_key = null;
 	
 	private LoadedTransaction settlingTransaction;
 	
@@ -103,8 +103,8 @@ public class LoadedTransaction extends Transaction {
 		confirmedParents = true;
 		dag.childLessBeacons.add(this);
 		
-		randomX_key = getHash().toString();
-		practical_randomX_key = getHash().toString();
+		randomX_key = getHash();
+		practical_randomX_key = getHash();
 		
 		for(int i = 0; i < 22; i++) {
 			difficulties.add(difficulty);
@@ -138,7 +138,7 @@ public class LoadedTransaction extends Transaction {
 		dag.childLessBeacons.remove(loadedParentBeacon);
 		dag.childLessBeacons.add(this);
 		
-		difficulty = DAG.calcDifficulty(loadedParentBeacon.getDifficulties(), loadedParentBeacon.getSolveTimes());
+		difficulty = calcDifficulty(loadedParentBeacon.getDifficulties(), loadedParentBeacon.getSolveTimes());
 		
 		synchronized(difficulties) {
 			synchronized(solveTimes) {
@@ -157,7 +157,7 @@ public class LoadedTransaction extends Transaction {
 
 		
 		if(beaconHeight % 2048 == 0)
-			randomX_key = getHash().toString();
+			randomX_key = getHash();
 		else
 			randomX_key = parentBeacon.randomX_key;
 		
@@ -243,11 +243,11 @@ public class LoadedTransaction extends Transaction {
 				lst.add(e);
 		}
 		
-	    if (lst.size() == 1 && !((LoadedTransaction)lst.get(0)).equals(mainChainBeaconChild)) {
+	    if (lst.size() == 1 && !lst.get(0).equals(mainChainBeaconChild)) {
 	        
 	    	lst.get(0).mainChainMember = true;
 	    	
-	        for (LoadedTransaction e : this.loadedChildBeacons) {
+	        for (LoadedTransaction e : loadedChildBeacons) {
 		          if (e.equals(lst.get(0)))
 		            continue; 
 		          e.undoChain();
@@ -256,7 +256,8 @@ public class LoadedTransaction extends Transaction {
 	    	
 	        lst.get(0).chooseNextBeacon();
 	        
-	     }
+	    }else if(lst.size() > 1 && mainChainBeaconChild != null)
+	    	mainChainBeaconChild.undoChain();
 		
 	}
 	
@@ -458,6 +459,25 @@ public class LoadedTransaction extends Transaction {
 		dag.writer.push(this);
 	}
 	
+	private BigInteger calcDifficulty(List<BigInteger> targets, List<Long> solveTimes) {
+		
+		int T = 60;
+		
+		BigInteger sumD = BigInteger.valueOf(0);
+		double sumST = 0;
+		
+		for (long solveTime : solveTimes) { 
+			sumD = sumD.add(targets.get(solveTimes.indexOf(solveTime))); 
+		   if (solveTime > 7*T) {solveTime = 7*T; }
+		   if (solveTime < -6*T) {solveTime = -6*T; }
+		   sumST += solveTime;
+		}
+		//sumST = 0.75*T*60
+		sumST = 990 + 0.2523*sumST;
+		return sumD.multiply(BigInteger.valueOf(T)).divide(BigInteger.valueOf((long) sumST));
+		
+	}
+	
 	public BeaconBranch getMainBeaconBranch() {
 		return beaconBranchs.keySet().iterator().next();
 	}
@@ -541,7 +561,7 @@ public class LoadedTransaction extends Transaction {
 		return new ArrayList<Long>(solveTimes);
 	}
 	
-	public String getRandomXKey() {
+	public Sha256Hash getRandomXKey() {
 		return practical_randomX_key;
 	}
 	

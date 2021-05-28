@@ -96,6 +96,7 @@ public class Main {
 		//Initialising DAG (transactions data structure)
 		try {
 			dag = new DAG(tipsSaveInterval);
+			new Thread(dag).start();
 		} catch (IOException e) {
 			System.out.println("Enable to create DAG: " + "\n terminating.");
 			e.printStackTrace();

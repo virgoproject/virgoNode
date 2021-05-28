@@ -14,9 +14,11 @@ import org.json.JSONObject;
 
 import io.virgo.virgoCryptoLib.Converter;
 import io.virgo.virgoCryptoLib.Sha256Hash;
+import io.virgo.virgoNode.DAG.DAG;
 import io.virgo.virgoNode.DAG.LoadedTransaction;
 import io.virgo.virgoNode.DAG.Transaction;
 import io.virgo.virgoNode.DAG.TxOutput;
+import io.virgo.virgoNode.DAG.TxVerificationPool.jsonVerificationTask;
 
 public class Database {
 
@@ -36,7 +38,7 @@ public class Database {
 		tipsCreateStmt.execute("CREATE TABLE IF NOT EXISTS tips (id text PRIMARY key, height integer);");
 		
 		Statement txsCreateStmt = conn.createStatement();
-		txsCreateStmt.execute("CREATE TABLE IF NOT EXISTS txs (id text PRIMARY key, sig data, pubKey data, parents text, inputs text, outputs text, parentBeacon text, nonce String, date integer);");
+		txsCreateStmt.execute("CREATE TABLE IF NOT EXISTS txs (id text PRIMARY key, sig data, pubKey data, parents text, inputs text, outputs text, parentBeacon data, nonce data, date integer);");
 		
 	}
 	
@@ -47,15 +49,18 @@ public class Database {
     	insertStmt.setString(1, tx.getHash().toString());
     	insertStmt.setString(4,  new JSONArray(tx.getParentsHashesStrings()).toString());
     	
-    	
     	if(tx.getParentBeaconHash() == null) {
         	insertStmt.setBytes(2, tx.getSignature().toByteArray());
         	insertStmt.setBytes(3, tx.getPublicKey());
     		insertStmt.setString(5,  new JSONArray(tx.getInputsHashesStrings()).toString());
+    		insertStmt.setBytes(7, null);
+    		insertStmt.setBytes(8, null);
     	} else {
     		insertStmt.setBytes(2, null);
     		insertStmt.setBytes(3, null);
     		insertStmt.setString(5, null);
+    		insertStmt.setBytes(7, tx.getParentBeaconHash().toBytes());
+      		insertStmt.setBytes(8, tx.getNonce());
     	}
     		
     		
@@ -63,9 +68,6 @@ public class Database {
 		for(Map.Entry<String, TxOutput> entry : tx.getOutputsMap().entrySet())
 		   outputsJson.put(entry.getValue().toString());
 		insertStmt.setString(6, outputsJson.toString());
-    	
-		insertStmt.setString(7, tx.getParentBeaconHashString());
-		insertStmt.setString(8, tx.getNonce());
 		insertStmt.setLong(9, tx.getDate());
 		
     	insertStmt.executeUpdate();
@@ -84,15 +86,15 @@ public class Database {
         	
     		txJson.put("parents", new JSONArray(result.getString("parents")));
     		
-    		String parentBeacon = result.getString("parentBeacon");
+    		byte[] parentBeaconBytes = result.getBytes("parentBeacon");
     		
-    		if(parentBeacon == null) {
+    		if(parentBeaconBytes == null) {
         		txJson.put("sig", Converter.bytesToHex(result.getBytes("sig")));
         		txJson.put("pubKey", Converter.bytesToHex(result.getBytes("pubKey")));
     			txJson.put("inputs", new JSONArray(result.getString("inputs")));
     		} else {
-    			txJson.put("parentBeacon", parentBeacon);
-    			txJson.put("nonce", result.getString("nonce"));
+    			txJson.put("parentBeacon", new Sha256Hash(parentBeaconBytes).toString());
+    			txJson.put("nonce", Converter.bytesToHex(result.getBytes("nonce")));
     		}
     			
     		txJson.put("outputs", new JSONArray(result.getString("outputs")));
@@ -165,6 +167,44 @@ public class Database {
 		
 		return tipsArray;
 		
+	}
+	
+	/**
+	 * Load all stored transactions to the DAG by insert order
+	 */
+	public void loadAllTransactions(DAG dag) throws SQLException {
+		
+		Statement getTransactionsStmt = conn.createStatement();
+		
+		if(getTransactionsStmt.execute("SELECT * FROM txs")) {
+			
+			ResultSet result = getTransactionsStmt.getResultSet();
+			
+			while(result.next()) {
+				
+	        	JSONObject txJson = new JSONObject();
+	        	
+	    		txJson.put("parents", new JSONArray(result.getString("parents")));
+	    		
+	    		byte[] parentBeaconBytes = result.getBytes("parentBeacon");
+	    		
+	    		if(parentBeaconBytes == null) {
+	        		txJson.put("sig", Converter.bytesToHex(result.getBytes("sig")));
+	        		txJson.put("pubKey", Converter.bytesToHex(result.getBytes("pubKey")));
+	    			txJson.put("inputs", new JSONArray(result.getString("inputs")));
+	    		} else {
+	    			txJson.put("parentBeacon", new Sha256Hash(parentBeaconBytes).toString());
+	    			txJson.put("nonce", Converter.bytesToHex(result.getBytes("nonce")));
+	    		}
+	    			
+	    		txJson.put("outputs", new JSONArray(result.getString("outputs")));
+	    		txJson.put("date", result.getLong("date"));
+	        	
+				dag.verificationPool. new jsonVerificationTask(txJson, true);
+				
+			}
+			
+		}
 	}
 	
 }
