@@ -1,11 +1,14 @@
 package io.virgo.virgoNode.REST;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
+import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.DAG.LoadedTransaction;
 import io.virgo.virgoNode.DAG.TxOutput;
+import io.virgo.virgoNode.DAG.TxVerificationPool.jsonVerificationTask;
 
 public class TxServlet {
 
@@ -16,16 +19,21 @@ public class TxServlet {
 		case 1:
 			if(arguments[0].equals("latest")) {
 				
-				JSONArray resp = new JSONArray(Main.getDAG().infos.getLatestTransactions(10));
+				JSONArray resp = new JSONArray();
+				
+				for(Sha256Hash txHash : Main.getDAG().infos.getLatestTransactions(10))
+					resp.put(txHash.toString());
+				
 				return new Response(200, resp.toString());
 				
 			}else {
 				
-				if(Main.getDAG().hasTransaction(arguments[0]))
-					return new Response(200, Main.getDAG().getTxJSON(arguments[0]).toString());
+				Sha256Hash txHash = new Sha256Hash(arguments[0]);
+				
+				if(Main.getDAG().hasTransaction(txHash))
+					return new Response(200, Main.getDAG().getTxJSON(txHash).toString());
 				else {
 					JSONObject resp = new JSONObject();
-					resp.put("tx", arguments[0]);
 					resp.put("notFound", true);
 					
 					return new Response(404, resp.toString());
@@ -39,7 +47,11 @@ public class TxServlet {
 				try {
 					int wanted = Integer.parseInt(arguments[1]);
 					
-					JSONArray resp = new JSONArray(Main.getDAG().infos.getLatestTransactions(wanted));
+					JSONArray resp = new JSONArray();
+					
+					for(Sha256Hash txHash : Main.getDAG().infos.getLatestTransactions(wanted))
+						resp.put(txHash.toString());
+					
 					return new Response(200, resp.toString());
 					
 				}catch(NumberFormatException e) {
@@ -51,14 +63,20 @@ public class TxServlet {
 				switch(arguments[1]) {
 				
 				case "state":
-					LoadedTransaction tx = Main.getDAG().getLoadedTx(arguments[0]);
+					LoadedTransaction tx = Main.getDAG().getLoadedTx(new Sha256Hash(arguments[0]));
 					
 					if(tx != null) {
 						JSONObject txState = new JSONObject();
 						
 						txState.put("status", tx.getStatus().ordinal());
-						txState.put("stability", tx.getStability());
-						txState.put("weight", tx.getWeight(true));
+						txState.put("confirmations", tx.confirmationCount());
+						
+						LoadedTransaction settler = tx.getSettlingTransaction();
+						
+						if(settler != null)
+							txState.put("beacon", settler.getHash().toString());
+						else
+							txState.put("beacon", "");
 						
 						JSONArray txOutputs = new JSONArray();
 						
@@ -67,7 +85,18 @@ public class TxServlet {
 							
 							outputState.put("address", out.getAddress());
 							outputState.put("amount", out.getAmount());
-							outputState.put("state", out.isSpent());
+							outputState.put("spent", out.isSpent());
+							
+							JSONArray outClaimers = new JSONArray();
+							
+							for(LoadedTransaction claimer : out.claimers) {
+								JSONObject outClaimer = new JSONObject();
+								outClaimer.put("id", claimer.getHash().toString());
+								outClaimer.put("status", claimer.getStatus().getCode());
+								outClaimers.put(outClaimer);
+							}
+							
+							outputState.put("claimers", outClaimers);
 							
 							txOutputs.put(outputState);
 						}
@@ -78,7 +107,6 @@ public class TxServlet {
 						
 					} else {
 						JSONObject resp = new JSONObject();
-						resp.put("tx", arguments[0]);
 						resp.put("notFound", true);
 						
 						return new Response(404, resp.toString());
@@ -89,11 +117,21 @@ public class TxServlet {
 				}
 				
 			}
-		
+			
 		default: return new Response(405, "");
 		
 		}		
 		
+	}
+
+	public static Response POST(String[] arguments, String requestBody) {
+		try {
+			JSONObject txJSON = new JSONObject(requestBody);
+			Main.getDAG().verificationPool. new jsonVerificationTask(txJSON, false);
+			return new Response(200, "");
+		}catch(JSONException|IllegalArgumentException e) {
+			return new Response(405, "");
+		}
 	}
 	
 }

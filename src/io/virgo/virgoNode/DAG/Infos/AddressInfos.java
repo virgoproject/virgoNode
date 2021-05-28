@@ -2,6 +2,7 @@ package io.virgo.virgoNode.DAG.Infos;
 
 import java.util.ArrayList;
 
+import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.DAG.LoadedTransaction;
 import io.virgo.virgoNode.DAG.TxOutput;
 import io.virgo.virgoNode.DAG.TxStatus;
@@ -9,8 +10,9 @@ import io.virgo.virgoNode.DAG.TxStatus;
 public class AddressInfos {
 
 	private String address;
-	private ArrayList<String> inputTxs = new ArrayList<String>();
-	private ArrayList<String> outputTxs = new ArrayList<String>();
+	private ArrayList<Sha256Hash> inputs = new ArrayList<Sha256Hash>();
+	private ArrayList<Sha256Hash> outputs = new ArrayList<Sha256Hash>();
+	private ArrayList<Sha256Hash> transactions = new ArrayList<Sha256Hash>();
 	
 	private long totalReceived = 0;
 	private long totalSent = 0;
@@ -26,46 +28,41 @@ public class AddressInfos {
 	 */
 	public void addTx(LoadedTransaction tx) {
 		
-		if(inputTxs.contains(tx.getUid()) || outputTxs.contains(tx.getUid()))
+		if(transactions.contains(tx.getHash()))
 			return;
 
 		//calculate this transaction's impact on the address balance
-		
 		long total = 0;
 		
-		if(tx.getAddress().equals(getAddress()))//we are sending funds
-			//get every input transaction and substract it's value from total
+		if(tx.getAddress().equals(getAddress())){
 			total -= tx.getTotalInput();
-		
-		//get the return output and add it to total, also add tx to inputs because there is something to spend on it
-		TxOutput returnOutput = tx.getOutputsMap().get(getAddress());
-		if(returnOutput != null) {
-			total += returnOutput.getAmount();
-			inputTxs.add(tx.getUid());
+			outputs.add(0, tx.getHash());
 		}
 		
+		//get the return output and add it to total, also add tx to inputs because there is something to spend on it
+		TxOutput input = tx.getOutputsMap().get(getAddress());
+		if(input != null){
+			total += input.getAmount();
+			inputs.add(0, tx.getHash());
+		}
+		
+		if(total != 0)
+			transactions.add(0, tx.getHash());
+		
 		//this transaction had something to do with this address
-		if(total > 0) {
+		if(total > 0)
 			//input transaction
 			if(tx.getStatus().isConfirmed())
 				totalReceived += total;
-			
-				
-		}else if(total < 0){
-			//output transaction
-			outputTxs.add(tx.getUid());
-			
+		else if(total < 0)
 			if(tx.getStatus().isConfirmed())
 				totalSent += Math.abs(total);
-			
-				
-		}
 		
 		
 	}
 	
 	public void updateTx(LoadedTransaction tx, TxStatus newStatus, TxStatus formerStatus) {
-		if(tx == null)
+		if(!transactions.contains(tx.getHash()))
 			return;
 		
 		long total = 0;
@@ -75,12 +72,10 @@ public class AddressInfos {
 			total -= tx.getTotalInput();
 		
 		//get the return output and add it to total, also add tx to inputs because there is something to spend on it
-		TxOutput returnOutput = tx.getOutputsMap().get(getAddress());
-		if(returnOutput != null) {
-			total += returnOutput.getAmount();
-			if(!inputTxs.contains(tx.getUid()))
-				inputTxs.add(tx.getUid());
-		}		
+		TxOutput input = tx.getOutputsMap().get(getAddress());
+		if(input != null)
+			total += input.getAmount();				
+		
 
 		if(total > 0) {
 			//input transaction
@@ -96,9 +91,6 @@ public class AddressInfos {
 			}
 				
 		}else if(total < 0){
-			
-			if(!outputTxs.contains(tx.getUid()))
-				outputTxs.add(tx.getUid());
 			
 			//output transaction
 			total = Math.abs(total);
@@ -130,12 +122,16 @@ public class AddressInfos {
 		return totalSent;
 	}
 
-	public String[] getInputTxs() {
-		return inputTxs.toArray(new String[inputTxs.size()]);
+	public ArrayList<Sha256Hash> getTransactions() {
+		return new ArrayList<Sha256Hash>(transactions);
 	}
 	
-	public String[] getOutputTxs() {
-		return outputTxs.toArray(new String[outputTxs.size()]);
+	public ArrayList<Sha256Hash> getInputs() {
+		return new ArrayList<Sha256Hash>(inputs);
+	}
+	
+	public ArrayList<Sha256Hash> getOutputs() {
+		return new ArrayList<Sha256Hash>(outputs);
 	}
 	
 }

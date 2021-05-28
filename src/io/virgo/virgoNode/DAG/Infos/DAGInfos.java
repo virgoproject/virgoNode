@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.concurrent.ConcurrentHashMap;
 
+import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.DAG.LoadedTransaction;
 import io.virgo.virgoNode.Utils.Miscellaneous;
@@ -12,7 +13,7 @@ public class DAGInfos {
 
 	final private ConcurrentHashMap<String, AddressInfos> addresses = new ConcurrentHashMap<String, AddressInfos>(); 
 	
-	private ArrayList<String> latestTransactions = new ArrayList<String>();
+	private ArrayList<Sha256Hash> latestTransactions = new ArrayList<Sha256Hash>();
 	
 	protected long transactionCount = 0;
 	
@@ -39,15 +40,15 @@ public class DAGInfos {
 		if(latestTransactions.size() >= 100)
 			latestTransactions.remove(0);
 		
-		latestTransactions.add(transaction.getUid());
+		latestTransactions.add(transaction.getHash());
 		
 	}
 	
-	public ArrayList<String> getLatestTransactions(int wanted){
+	public ArrayList<Sha256Hash> getLatestTransactions(int wanted){
 		
-		ArrayList<String> lastTxs = new ArrayList<String>(
+		ArrayList<Sha256Hash> lastTxs = new ArrayList<Sha256Hash>(
 				latestTransactions.subList(latestTransactions.size()-Math.max(1, Math.min(latestTransactions.size(), wanted)),
-						latestTransactions.size()) );
+						latestTransactions.size()));
 		
 		Collections.reverse(lastTxs);
 		

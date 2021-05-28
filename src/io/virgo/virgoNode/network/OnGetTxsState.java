@@ -4,6 +4,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import io.virgo.geoWeb.Peer;
+import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.DAG.LoadedTransaction;
 import io.virgo.virgoNode.DAG.TxOutput;
@@ -19,17 +20,16 @@ public class OnGetTxsState {
 		
 		JSONArray txsUids = messageJson.getJSONArray("txs");
 		for(int i = 0; i < txsUids.length(); i++) {
-			String uid = txsUids.getString(i);
+			Sha256Hash hash = new Sha256Hash(txsUids.getString(i));
 			
 			JSONObject txState = new JSONObject();
-			txState.put("tx", uid);
+			txState.put("tx", txsUids.getString(i));
 			
-			if(Main.getDAG().isLoaded(uid)) {
-				LoadedTransaction tx = Main.getDAG().getLoadedTx(uid);
+			if(Main.getDAG().isLoaded(hash)) {
+				LoadedTransaction tx = Main.getDAG().getLoadedTx(hash);
 				
 				txState.put("status", tx.getStatus().ordinal());
-				txState.put("stability", tx.getStability());
-				txState.put("weight", tx.getWeight(true));
+				txState.put("confirmations", tx.confirmationCount());
 
 				JSONArray txOutputs = new JSONArray();
 				

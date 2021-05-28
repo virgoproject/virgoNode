@@ -7,7 +7,11 @@ import org.json.JSONObject;
 
 import io.virgo.geoWeb.Peer;
 import io.virgo.virgoCryptoLib.Converter;
+import io.virgo.virgoCryptoLib.Sha256;
+import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
+import io.virgo.virgoNode.DAG.TxVerificationPool.jsonVerificationTask;
+import io.virgo.virgoNode.Utils.Miscellaneous;
 
 public class OnTxs {
 
@@ -20,36 +24,44 @@ public class OnTxs {
 			
 			JSONObject txJson = txs.getJSONObject(i);
 		
-			String txUid = Converter.Addressify(Converter.hexToBytes(txJson.getString("sig")), Main.TX_IDENTIFIER);
+			Sha256Hash txHash;
 			
-			if(Main.getDAG().hasTransaction(txUid))
+			if(txJson.has("parentBeacon")) {
+				txHash = Sha256.getDoubleHash((txJson.getJSONArray("parents").toString()
+						+ txJson.getJSONArray("outputs").toString()
+						+ txJson.getString("parentBeacon")
+						+ txJson.getLong("date")
+						+ txJson.getLong("nonce")).getBytes());
+			}else {
+				txHash = Sha256.getDoubleHash(Converter.concatByteArrays(
+						(txJson.getJSONArray("parents").toString() + txJson.getJSONArray("inputs").toString() + txJson.getJSONArray("outputs").toString()).getBytes(),
+						Converter.hexToBytes(txJson.getString("sig")), Converter.hexToBytes(txJson.getString("pubKey")), Miscellaneous.longToBytes(txJson.getLong("date"))));
+			}
+			
+			
+			if(Main.getDAG().hasTransaction(txHash))
 				continue;
 			
-			byte[] sigBytes = Converter.hexToBytes(txJson.getString("sig"));
-			byte[] pubKey = Converter.hexToBytes(txJson.getString("pubKey"));
-			JSONArray parents = txJson.getJSONArray("parents");
-			JSONArray inputs = txJson.getJSONArray("inputs");
-			JSONArray outputs = txJson.getJSONArray("outputs");
-			long date = txJson.getLong("date");
-			
+
 			try {
-				Main.getDAG().initTx(sigBytes, pubKey, parents, inputs, outputs, date, false);
+				Main.getDAG().verificationPool. new jsonVerificationTask(txJson, false);
 				
 				if(messageJson.has("callback")) {
 					JSONObject txCallback = new JSONObject();	
 					txCallback.put("command", "txCallback");
-					txCallback.put("id", txUid);
+					txCallback.put("id", txHash.toString());
 					txCallback.put("result", true);
 					peer.respondToMessage(txCallback, messageJson);
 				}
 				
-				transactionsToBroadcast.put(txUid);
+				transactionsToBroadcast.put(txHash.toString());
 				
 			}catch(IllegalArgumentException e) {
+				e.printStackTrace();
 				if(messageJson.has("callback")) {
 					JSONObject txCallback = new JSONObject();	
 					txCallback.put("command", "txCallback");
-					txCallback.put("id", txUid);
+					txCallback.put("id", txHash);
 					txCallback.put("result", false);
 					peer.respondToMessage(txCallback, messageJson);
 				}

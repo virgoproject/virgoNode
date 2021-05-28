@@ -13,8 +13,8 @@ public class OnGetNodeInfos {
 		nodeInfosResp.put("command", "nodeInfos");
 		nodeInfosResp.put("appName", Main.getAppName());
 		nodeInfosResp.put("netID", Main.getNetID());
-		nodeInfosResp.put("DAGHeight", Main.getDAG().getMainChainLength());
-		nodeInfosResp.put("DAGWeight", Main.getDAG().infos.getTransactionCount());
+		nodeInfosResp.put("DAGHeight", Main.getDAG().getBestTipBeacon().getBeaconHeight());
+		nodeInfosResp.put("DAGWeight", Main.getDAG().getGenesis().getWeight());
 		nodeInfosResp.put("poolSize", Main.getDAG().getPoolSize());
 		
 		peer.respondToMessage(nodeInfosResp, messageJson);

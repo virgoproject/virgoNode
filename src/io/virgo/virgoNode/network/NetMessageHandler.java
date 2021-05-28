@@ -57,11 +57,13 @@ public class NetMessageHandler extends MessageHandler {
 					
 				case "getNodeInfos":
 					OnGetNodeInfos.handle(messageJson, peer);
+					break;
+					
+				case "getPoWInformations":
+					OnGetPoWInformations.handle(messageJson, peer);
 			}
 			
-		}catch(JSONException e) {
-			System.out.println(e.getMessage());
-		}
+		}catch(JSONException|IllegalArgumentException e) {}
 	}
 	
 }

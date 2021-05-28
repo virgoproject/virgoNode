@@ -8,4 +8,4 @@
 /.eclipse-pmd
 /.classpath
 /.project
-/pom.xml
+/peers.json

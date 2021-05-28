@@ -1,25 +1,23 @@
 package io.virgo.virgoNode.DAG;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 import io.virgo.virgoCryptoLib.Converter;
+import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.Utils.Miscellaneous;
 
 public class TxOutput {
 
-	private String originTx;
+	private Sha256Hash originTx;
 	private String address;
 	private long amount;
-	public LoadedTransaction claimedByLoaded;
+	public List<LoadedTransaction> claimers = Collections.synchronizedList(new ArrayList<LoadedTransaction>());
 	
-	public TxOutput(String address, long amount, String originTx, String originAddress) {
-		this.address = address;
-		this.amount = amount;
-		this.originTx = originTx;
-	}
-	
-	public TxOutput(String address, long amount, String originTx, String originAddress, String claimedBy) {
+	public TxOutput(String address, long amount, Sha256Hash originTx) {
 		this.address = address;
 		this.amount = amount;
 		this.originTx = originTx;
@@ -34,19 +32,14 @@ public class TxOutput {
 	 * @throws ArithmeticException Given amount is out of range
 	 * @throws IllegalArgumentException Can't build a TxOutput from this string
 	 */
-	public static TxOutput fromString(String inputString, String originTx, String originAddress) throws ArithmeticException, IllegalArgumentException {
+	public static TxOutput fromString(String inputString, Sha256Hash originTx) throws ArithmeticException, IllegalArgumentException {
 		
 		String[] outArgs = inputString.split(",");
 		
-		switch(outArgs.length) {
-		case 2:
-			if(Miscellaneous.validateAddress(outArgs[0], Main.ADDR_IDENTIFIER))
-				return new TxOutput(outArgs[0], Converter.hexToDec(outArgs[1]).longValueExact(), originTx, originAddress);
-			break;
-		case 3:
-			if(Miscellaneous.validateAddress(outArgs[0], Main.ADDR_IDENTIFIER) && Miscellaneous.validateAddress(outArgs[2], Main.TX_IDENTIFIER))
-				return new TxOutput(outArgs[0], Converter.hexToDec(outArgs[1]).longValueExact(), originTx, originAddress, outArgs[3]);
-		}
+		long value = Converter.hexToDec(outArgs[1]).longValueExact();
+		
+		if(Miscellaneous.validateAddress(outArgs[0], Main.ADDR_IDENTIFIER) && value > 0)
+			return new TxOutput(outArgs[0], value, originTx);
 		
 		throw new IllegalArgumentException("Can't build a TxOutput from this string.");
 	}
@@ -60,7 +53,7 @@ public class TxOutput {
 		
 	}
 	
-	public String getOriginTx() {
+	public Sha256Hash getOriginTx() {
 		return originTx;
 	}
 	
@@ -69,6 +62,11 @@ public class TxOutput {
 	}
 
 	public boolean isSpent() {
-		return claimedByLoaded != null;
+		for(LoadedTransaction claimer : claimers) {
+			if(claimer.getStatus().isConfirmed())
+				return true;
+		}
+		return false;
 	}
+
 }

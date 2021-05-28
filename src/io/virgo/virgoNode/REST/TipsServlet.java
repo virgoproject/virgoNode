@@ -1,18 +1,20 @@
 package io.virgo.virgoNode.REST;
 
 import org.json.JSONArray;
-import org.json.JSONObject;
 
+import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 
 public class TipsServlet {
 
 	public static Response GET() {
 		
-		JSONObject response = new JSONObject();
-		response.put("tips", new JSONArray(Main.getDAG().getTipsUids()));
+		JSONArray tips = new JSONArray();
 		
-		return new Response(200, response.toString());
+		for(Sha256Hash txHash : Main.getDAG().getTipsUids())
+			tips.put(txHash.toString());
+		
+		return new Response(200, tips.toString());
 		
 	}
 	

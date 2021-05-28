@@ -11,9 +11,10 @@ public class NodeInfosServlet {
 		JSONObject nodeInfosResp = new JSONObject();
 		nodeInfosResp.put("appName", Main.getAppName());
 		nodeInfosResp.put("netID", Main.getNetID());
-		nodeInfosResp.put("DAGHeight", Main.getDAG().getMainChainLength());
-		nodeInfosResp.put("DAGWeight", Main.getDAG().infos.getTransactionCount());
-		nodeInfosResp.put("poolSize", Main.getDAG().getPoolSize());
+		nodeInfosResp.put("BeaconChainWeight", Main.getDAG().getGenesis().getWeight());
+		nodeInfosResp.put("BeaconChainHeight", Main.getDAG().getBestTipBeacon().getBeaconHeight()+1);
+		nodeInfosResp.put("DAGHeight", Main.getDAG().getLoadedTx(Main.getDAG().getTipsUids().get(0)).getHeight()+1);
+		nodeInfosResp.put("DAGSize", Main.getDAG().loadedTxsCount());
 		
 		return new Response(200, nodeInfosResp.toString());
 	}
