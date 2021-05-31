@@ -23,6 +23,7 @@ public class AddressInfos {
 	
 	/**
 	 * Add a tx to the resume if it has something to do with this address
+	 * Calculate it's impact on this address
 	 * 
 	 * @param tx the tx to add
 	 */
@@ -61,6 +62,9 @@ public class AddressInfos {
 		
 	}
 	
+	/**
+	 * Update a previously processed transaction according to it's new status
+	 */
 	public void updateTx(LoadedTransaction tx, TxStatus newStatus, TxStatus formerStatus) {
 		if(!transactions.contains(tx.getHash()))
 			return;

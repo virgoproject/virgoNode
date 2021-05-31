@@ -13,6 +13,10 @@ import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.DAG.DAG;
 import io.virgo.virgoNode.network.Peers;
 
+/**
+ * Runnable loading transactions from disk
+ * Ask the network  requested transaction if not on disk
+ */
 public class TxLoader implements Runnable{
 
 	DAG dag;
@@ -48,11 +52,19 @@ public class TxLoader implements Runnable{
 		}
 	}
 
+	/**
+	 * Request to load a transaction
+	 * The runnable will load it if present in database, else it will ask the network for it
+	 */
 	public void push(Sha256Hash tx) {
 		if(!queue.contains(tx) && !dag.isTxWaiting(tx) && !dag.isLoaded(tx))
 			queue.add(tx);
 	}
 	
+	/**
+	 * Request to load a set of transaction
+	 * The runnable will load them if present in database, else it will ask the network for the missing ones
+	 */
 	public void push(Collection<Sha256Hash> txs) {
 		for(Sha256Hash tx : txs) {
 			if(!queue.contains(tx) && !dag.isTxWaiting(tx))

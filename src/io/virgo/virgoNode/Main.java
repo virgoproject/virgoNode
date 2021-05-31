@@ -49,7 +49,6 @@ public class Main {
 	
 	/**
 	 * Main function called on Application startup
-	 * 
 	 */
 	public static void main(String[] none) {
 		

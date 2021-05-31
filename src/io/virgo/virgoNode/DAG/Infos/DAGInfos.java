@@ -36,6 +36,10 @@ public class DAGInfos {
 		return addrInfos;
 	}
 	
+	/**
+	 * Called when a new transaction is loaded
+	 * Currently just maintain a list of the 100 latest loaded transactions
+	 */
 	public void addTransaction(LoadedTransaction transaction) {
 		if(latestTransactions.size() >= 100)
 			latestTransactions.remove(0);

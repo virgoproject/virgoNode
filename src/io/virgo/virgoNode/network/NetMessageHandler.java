@@ -8,8 +8,6 @@ import io.virgo.geoWeb.Peer;
 
 /**
  * Class handling peers messages, like new transactions or transaction requests
- * TODO: Refactor into a function oriented event handler
- *
  */
 public class NetMessageHandler extends MessageHandler {
 
@@ -43,24 +41,8 @@ public class NetMessageHandler extends MessageHandler {
 					OnTips.handle(messageJson, peer);
 					break;
 					
-				case "getBalances":
-					OnGetBalances.handle(messageJson, peer);
-					break;
-					
-				case "getAddrTxs":
-					OnGetAddrTxs.handle(messageJson, peer);
-					break;
-					
-				case "getTxsState":
-					OnGetTxsState.handle(messageJson, peer);
-					break;
-					
 				case "getNodeInfos":
 					OnGetNodeInfos.handle(messageJson, peer);
-					break;
-					
-				case "getPoWInformations":
-					OnGetPoWInformations.handle(messageJson, peer);
 			}
 			
 		}catch(JSONException|IllegalArgumentException e) {}

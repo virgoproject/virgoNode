@@ -7,6 +7,12 @@ import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.DAG.LoadedTransaction;
 
+/**
+ * REST API PoW Work servlet
+ * 	<br><br>
+ *  GET Methods:<br>
+ *  /work
+ */
 public class WorkServlet {
 
 	public static Response GET() {

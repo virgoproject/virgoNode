@@ -218,6 +218,9 @@ public class TxVerificationPool {
 		
 	}
 	
+	/**
+	 * Check for a transaction validity, if all good send it to DAG thread
+	 */
 	public class transactionVerificationTask implements Runnable {
 
 		Transaction tx;
@@ -275,6 +278,9 @@ public class TxVerificationPool {
 		
 	}
 	
+	/**
+	 * Check for beacon transaction validity, if all good send it to DAG thread 
+	 */
 	public class beaconVerificationTask implements Runnable {
 
 		Transaction tx;

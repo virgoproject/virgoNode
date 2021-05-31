@@ -68,6 +68,7 @@ public class DAG implements Runnable {
 		
 		System.out.println("Genesis TxUid is " + genesis.getHash().toString());
 
+		
 		//start transaction writer thread (writes transactions to disk)
 		writer = new TxWriter(this);
 		new Thread(writer).start();
@@ -76,6 +77,7 @@ public class DAG implements Runnable {
 		loader = new TxLoader(this);
 		new Thread(loader).start();
 		
+		//Start transaction verification pool
 		verificationPool = new TxVerificationPool(this);
 		
 		//load saved transactions
@@ -107,6 +109,7 @@ public class DAG implements Runnable {
 		
 	}
 
+	//DAG thread receives raw verified transactions and try to load them
 	public void run() {
 		
 		while(!Thread.interrupted()) {
@@ -137,6 +140,10 @@ public class DAG implements Runnable {
 		return loadedTransactions.get(hash);
 	}
 	
+	/**
+	 * Check if beacon has all it's parents loaded, if so send it to verification pool
+	 * to check that it's randomX hash match the required difficulty
+	 */
 	private void checkBeaconTx(Transaction tx) {
 		if(loadedTransactions.containsKey(tx.getHash()) || waitingTxsHashes.contains(tx.getHash()))
 			return;
@@ -169,6 +176,9 @@ public class DAG implements Runnable {
 		verificationPool.new beaconVerificationTask(tx, parentBeacon, loadedParents);
 	}
 	
+	/**
+	 * Add the given beacon to the DAG, at this point it's fully verified and safe to do so
+	 */
 	private void loadBeaconTx(Transaction tx, ArrayList<LoadedTransaction> loadedParents, LoadedTransaction parentBeacon) {
 		if(loadedTransactions.containsKey(tx.getHash()) || waitingTxsHashes.contains(tx.getHash()))
 			return;
@@ -186,6 +196,10 @@ public class DAG implements Runnable {
 		
 	}
 	
+	/**
+	 * Check if this transaction's related txs are loaded
+	 * if so send it to verification pool for differents checks
+	 */
 	private void checkTx(Transaction tx) {
 		if(loadedTransactions.containsKey(tx.getHash()) || waitingTxsHashes.contains(tx.getHash()))
 			return;
@@ -223,7 +237,7 @@ public class DAG implements Runnable {
 	}
 	
 	/**
-	 * Initiate transaction from Transaction object
+	 * Add the given transaction to the DAG, safe to do as it's fully verified at this point
 	 */
 	private void loadTx(Transaction tx, ArrayList<LoadedTransaction> loadedParents, ArrayList<LoadedTransaction> loadedInputs) {
 		if(loadedTransactions.containsKey(tx.getHash()) || waitingTxsHashes.contains(tx.getHash()))
@@ -290,6 +304,12 @@ public class DAG implements Runnable {
 		return bestParents;
 	}
 
+	/**
+	 * Get the best suited beacon for proof of work
+	 * Select the tip beacon with the most weight (solved difficulty)
+	 * If there is other tips with the same weight select the highest one (chain height)
+	 * If there is other tips with the same weight and height select the one with lower date
+	 */
 	public LoadedTransaction getBestTipBeacon() {
 		LoadedTransaction selectedBeacon = null;
 		
@@ -404,6 +424,7 @@ public class DAG implements Runnable {
 	public LoadedTransaction[] getTips() {
 		return childLessTxs.toArray(new LoadedTransaction[childLessTxs.size()]);
 	}
+	
 	
 	public class txTask {
 		

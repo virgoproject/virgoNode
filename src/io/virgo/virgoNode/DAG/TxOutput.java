@@ -10,6 +10,11 @@ import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.Utils.Miscellaneous;
 
+/**
+ * Represent a transaction output
+ * Basically recipient address, amount and a list of transactions
+ * that are claiming this output
+ */
 public class TxOutput {
 
 	private Sha256Hash originTx;

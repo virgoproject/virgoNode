@@ -33,7 +33,6 @@ public class Transaction {
 	private long date;
 	
 	private long outputsValue = 0;
-	private long returnAmount = 0;
 	
 	//beacon transaction related variables
 	private Sha256Hash parentBeaconHash = null;
@@ -41,6 +40,9 @@ public class Transaction {
 	
 	private boolean isSaved;
 	
+	/**
+	 * Basic transaction constructor
+	 */
 	public Transaction(Sha256Hash hash, byte[] pubKey, ECDSASignature signature, Sha256Hash[] parentsHashes, Sha256Hash[] inputsHashes, TxOutput[] outputs, long date, boolean isSaved) {
 		
 		this.hash = hash;
@@ -56,17 +58,17 @@ public class Transaction {
 		
 		this.date = date;
 		
+		//calculate outputs sum
 		for(TxOutput out : outputs) {
 			this.outputs.put(out.getAddress(), out);
-			if(out.getAddress().equals(address))
-				returnAmount += out.getAmount();
-			
-				
 			outputsValue += out.getAmount();
 		}
 		
 	}
 	
+	/**
+	 * Beacon transaction constructor
+	 */
 	public Transaction(Sha256Hash hash, Sha256Hash[] parentsHashes, TxOutput[] outputs, Sha256Hash parentBeaconHash, byte[] nonce, long date, boolean isSaved) {
 		
 		this.hash = hash;
@@ -84,6 +86,7 @@ public class Transaction {
 		
 		this.date = date;
 		
+		//calculate outputs sum
 		for(TxOutput out : outputs) {
 			this.outputs.put(out.getAddress(), out);
 			outputsValue += out.getAmount();
@@ -91,7 +94,7 @@ public class Transaction {
 		
 	}
 	
-	/*
+	/**
 	 * genesis constructor
 	 */
 	public Transaction(TxOutput[] outputs) {
@@ -108,7 +111,6 @@ public class Transaction {
 		date = 0;
 		
 		isGenesis = true;
-		returnAmount = 0;
 		
 		parentBeaconHash = null;
 		nonce = null;
@@ -124,7 +126,6 @@ public class Transaction {
 		this.outputs = baseTransaction.getOutputsMap();
 		this.date = baseTransaction.getDate();
 		this.outputsValue = baseTransaction.getOutputsValue();
-		this.returnAmount = baseTransaction.getReturnAmount();
 		this.hash = baseTransaction.getHash();
 		this.address = baseTransaction.getAddress();
 		this.isGenesis = baseTransaction.isGenesis();
@@ -160,11 +161,7 @@ public class Transaction {
 	public boolean isBeaconTransaction() {
 		return parentBeaconHash != null;
 	}
-	
-	public long getReturnAmount() {
-		return returnAmount;
-	}
-	
+
 	public long getOutputsValue() {
 		return outputsValue;
 	}

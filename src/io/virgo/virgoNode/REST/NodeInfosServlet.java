@@ -4,6 +4,12 @@ import org.json.JSONObject;
 
 import io.virgo.virgoNode.Main;
 
+/**
+ * REST API Node Infos servlet
+ * 	<br><br>
+ *  GET Methods:<br>
+ *  /nodeinfos
+ */
 public class NodeInfosServlet {
 
 	public static Response GET() {

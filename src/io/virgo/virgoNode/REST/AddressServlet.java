@@ -9,12 +9,20 @@ import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.DAG.Infos.AddressInfos;
 
+/**
+ * REST API Address servlet
+ * 	<br><br>
+ *  GET Methods:<br>
+ *  /address/{addr}/txs/[count]/[page] <br>
+ *  /address/{addr}/inputs/[count]/[page] <br>
+ *  /address/{addr}/outputs/[count]/[page] <br>
+ *  /address/{addr}/balance <br>
+ */
 public class AddressServlet {
 
 	public static Response GET(String[] arguments) {
 		
 		if(arguments.length >= 2) {
-			
 			
 			if(!Main.getDAG().infos.hasAddressInfos(arguments[0])) {
 				JSONObject resp = new JSONObject();

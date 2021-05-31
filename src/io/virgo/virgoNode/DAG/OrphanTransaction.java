@@ -19,7 +19,9 @@ public class OrphanTransaction extends Transaction {
 	}
 
 	/**
-	 * Called when a transaction we where waiting for is loaded
+	 * Called when a transaction we were waiting for is loaded
+	 * Remove waited transaction from the list of waited
+	 * If no more transaction waited then try to load 
 	 */
 	public void removeWaitedTx(Sha256Hash tx, DAG dag) {
 		waitedTxs.remove(tx);

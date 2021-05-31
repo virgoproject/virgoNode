@@ -6,6 +6,9 @@ import java.util.concurrent.LinkedBlockingQueue;
 import io.virgo.virgoNode.DAG.DAG;
 import io.virgo.virgoNode.DAG.TxOutput;
 
+/**
+ * Runnable handling events occurring on the node
+ */
 public class EventListener implements Runnable {
 	
 	DAG dag;
@@ -18,11 +21,17 @@ public class EventListener implements Runnable {
 	}
 	
 	
+	/**
+	 * Add an event to the queue
+	 */
 	public void notify(Event event) {
 		queue.add(event);
 	}
 	
-	
+	/**
+	 * Transaction Loaded event handler
+	 * Call addTx(transaction) on the concerned AddressInfos objects
+	 */
 	public void onTransactionLoaded(TransactionLoadedEvent e) {
 		try {
 			dag.infos.getAddressInfos(e.affectedTransaction.getAddress()).addTx(e.affectedTransaction);
@@ -36,6 +45,10 @@ public class EventListener implements Runnable {
 		dag.infos.addTransaction(e.affectedTransaction);
 	}
 	
+	/**
+	 * Transaction status changed event handler
+	 * Call updateTx(transaction) on the concerned AddressInfos objects
+	 */
 	public void onTransactionStatusChanged(TransactionStatusChangedEvent e) {
 		dag.infos.getAddressInfos(e.affectedTransaction.getAddress()).updateTx(e.affectedTransaction, e.newStatus, e.formerStatus);
 		
@@ -46,6 +59,10 @@ public class EventListener implements Runnable {
 	}
 
 
+	/**
+	 * Wait for an Event object to appear in the queue, take it and proccess it
+	 * with the corresponding Event Handler
+	 */
 	@Override
 	public void run() {
 		while(!interrupt) {

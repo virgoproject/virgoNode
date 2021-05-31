@@ -7,7 +7,10 @@ import java.util.Arrays;
 
 import com.sun.net.httpserver.HttpServer;
 
-//TODO: Complete API, make things configurable (require auth, enable or not API, choose serverPort..) 
+//TODO: Complete API, make things configurable (require auth, enable or not API, choose serverPort..)
+/**
+ * REST API http server
+ */
 public class Server {
 
 	public Server() throws IOException {

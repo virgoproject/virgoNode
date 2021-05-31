@@ -8,8 +8,18 @@ import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.DAG.LoadedTransaction;
 import io.virgo.virgoNode.DAG.TxOutput;
-import io.virgo.virgoNode.DAG.TxVerificationPool.jsonVerificationTask;
 
+/**
+ * REST API Transaction servlet
+ * 	<br><br>
+ *  GET Methods:<br>
+ *  /tx/latest/[count] <br>
+ *  /tx/{transactionHash} <br>
+ *  /tx/{transactionHash}/state
+ *  <br><br>
+ *  POST Methods:<br>
+ *  /tx (request body: transaction JSON)
+ */
 public class TxServlet {
 
 	public static Response GET(String[] arguments) {

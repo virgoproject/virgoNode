@@ -44,13 +44,17 @@ public class LoadedTransaction extends Transaction {
 	private boolean mainChainMember = false;
 	private boolean confirmedParents = false;
 	private ArrayList<LoadedTransaction> conflictualTxs = new ArrayList<LoadedTransaction>();
-	private List<Long> solveTimes = Collections.synchronizedList(new ArrayList<Long>());//solveTimes of the last 22 parent blocks
-	private List<BigInteger> difficulties = Collections.synchronizedList(new ArrayList<BigInteger>());//difficulties of the last 22 parent blocks
+	private List<Long> solveTimes = new ArrayList<Long>();//solveTimes of the last 22 parent blocks
+	private List<BigInteger> difficulties = new ArrayList<BigInteger>();//difficulties of the last 22 parent blocks
+	
 	private Sha256Hash randomX_key = null;
 	private Sha256Hash practical_randomX_key = null;
 	
 	private LoadedTransaction settlingTransaction;
 	
+	/**
+	 * Basic transaction constructor
+	 */
 	public LoadedTransaction(DAG dag, Transaction baseTransaction, LoadedTransaction[] parents, LoadedTransaction[] inputTxs) {
 		
 		super(baseTransaction);
@@ -90,7 +94,9 @@ public class LoadedTransaction extends Transaction {
 		dag.getEventListener().notify(new TransactionLoadedEvent(this));
 	}
 	
-	//genesis constructor
+	/**
+	 * genesis constructor
+	 */
 	public LoadedTransaction(DAG dag, TxOutput[] genesisOutputs) {
 		super(genesisOutputs);
 		
@@ -98,7 +104,9 @@ public class LoadedTransaction extends Transaction {
 		
 		status = TxStatus.CONFIRMED;
 		
+		//set base difficulty
 		difficulty = BigInteger.valueOf(10000);
+		
 		mainChainMember = true;
 		confirmedParents = true;
 		dag.childLessBeacons.add(this);
@@ -106,6 +114,7 @@ public class LoadedTransaction extends Transaction {
 		randomX_key = getHash();
 		practical_randomX_key = getHash();
 		
+		//Prefill difficulties and solveTimes with perfect values to smooth first blocks difficulty drop
 		for(int i = 0; i < 22; i++) {
 			difficulties.add(difficulty);
 			solveTimes.add(60l);
@@ -113,6 +122,7 @@ public class LoadedTransaction extends Transaction {
 		
 		settlingTransaction = this;
 		
+		//create base beacon branch
 		BeaconBranch beaconBranch = new BeaconBranch();
 		beaconBranch.addTx(this);
 		beaconBranchs.put(beaconBranch, BigInteger.ZERO);
@@ -120,7 +130,9 @@ public class LoadedTransaction extends Transaction {
 		dag.getEventListener().notify(new TransactionLoadedEvent(this));
 	}
 	
-	
+	/**
+	 * Beacon transaction constructor
+	 */
 	public LoadedTransaction(DAG dag, Transaction baseTransaction, LoadedTransaction[] parents, LoadedTransaction parentBeacon) {
 		super(baseTransaction);
 		
@@ -138,29 +150,31 @@ public class LoadedTransaction extends Transaction {
 		dag.childLessBeacons.remove(loadedParentBeacon);
 		dag.childLessBeacons.add(this);
 		
+		//Calculate next beacon difficulty
 		difficulty = calcDifficulty(loadedParentBeacon.getDifficulties(), loadedParentBeacon.getSolveTimes());
 		
-		synchronized(difficulties) {
-			synchronized(solveTimes) {
-				difficulties = loadedParentBeacon.getDifficulties();
-				solveTimes = loadedParentBeacon.getSolveTimes();
-				
-				if(difficulties.size() == 22)
-					difficulties.remove(0);
-				difficulties.add(difficulty);
-				
-				if(solveTimes.size() == 22)
-					solveTimes.remove(0);
-				solveTimes.add((getDate()-loadedParentBeacon.getDate())/1000);
-			}
-		}
-
+		//Update difficulties and solvetimes arrays for next beacon difficulty calculation
+		difficulties = loadedParentBeacon.getDifficulties();
+		solveTimes = loadedParentBeacon.getSolveTimes();
 		
+		if(difficulties.size() == 22)
+			difficulties.remove(0);
+		difficulties.add(difficulty);
+		
+		if(solveTimes.size() == 22)
+			solveTimes.remove(0);
+		solveTimes.add((getDate()-loadedParentBeacon.getDate())/1000);
+		
+		//Change the randomX key to this transaction hash if if it is a multiple of 2048
 		if(beaconHeight % 2048 == 0)
 			randomX_key = getHash();
 		else
 			randomX_key = parentBeacon.randomX_key;
 		
+		/*
+		 * Get the randomX key 64 beacons behind and use it for the next beacon
+		 * So there is a 64 beacons delay between randomX key change and effectiveness
+		 */
 		LoadedTransaction beacon64old = this;
 		for(int i = 0; i < 64; i++) {
 			if(beacon64old.isGenesis())
@@ -169,6 +183,7 @@ public class LoadedTransaction extends Transaction {
 		}
 		
 		practical_randomX_key = beacon64old.randomX_key;
+		
 		
 		//Add this transaction to tips list
 		dag.childLessTxs.add(this);
@@ -189,11 +204,18 @@ public class LoadedTransaction extends Transaction {
 				if(parent.getHeight() > height-1)
 					height = parent.getHeight() + 1;
 		
+		
 		setupBeaconBranch();
 		
 		dag.getEventListener().notify(new TransactionLoadedEvent(this));
 	}
 	
+	/**
+	 * Add this beacon to parent beacon's branch or create a new branch
+	 * if it's a fork (parent already has a child)
+	 * 
+	 * Branchs unable optimization of beacon weight and confirmations count calculation
+	 */
 	private void setupBeaconBranch() {
 		
 		if(loadedParentBeacon.childs.size() == 1) {//transaction is parent's first child, make part of parent's main branch
@@ -216,6 +238,23 @@ public class LoadedTransaction extends Transaction {
 		chooseNextBeacon();
 	}
 	
+	/**
+	 * Update beacon chain
+	 * If the current beacon is not part of the main chain then recursively
+	 * call this function on parent beacons until reaching the main chain
+	 * 
+	 * once on a mainchain beacon, confirm the child with most weight and refuse others
+	 * If there is equality between two major beacon then unconfirm all major beacon until
+	 * resolution
+	 * 
+	 * When a beacon is refused or unconfirmed it does the same all it's child
+	 * 
+	 * When confirming a beacon, we first run setSettler() which mark all parent transactions
+	 * until reaching parent beacon domain, and also check for conflictual transactions
+	 * 
+	 * Then, confirm all marked transactions and resolve conflictual ones by confirming the one
+	 * with more weight, or refuse all if none
+	 */
 	private void chooseNextBeacon() {
 		
 		if(!mainChainMember) {
@@ -261,6 +300,9 @@ public class LoadedTransaction extends Transaction {
 		
 	}
 	
+	/**
+	 * Confirm this beacon and resolve settled transactions conflicts
+	 */
 	private void confirmParents() {
 		confirmedParents = true;
 		confirmTx();
@@ -275,7 +317,7 @@ public class LoadedTransaction extends Transaction {
 			for(TxOutput input : conflictingTransaction.loadedInputs) {
 				for(LoadedTransaction claimer : input.claimers)
 					if(claimer != conflictingTransaction &&
-					claimer.confirmationCount() >= conflictingTransaction.confirmationCount())
+					claimer.getSettlingTransaction().getWeight().compareTo(conflictingTransaction.getSettlingTransaction().getWeight()) >= 0)
 						canConfirm = false;
 						break b;
 			}
@@ -289,6 +331,13 @@ public class LoadedTransaction extends Transaction {
 		
 	}
 	
+	/**
+	 * Settle this transaction and parent transactions with given beacon
+	 * until reaching already settled transactions.
+	 * 
+	 * Settling is confirming transactions that aren't conflicting with other
+	 * and adding conflictual transactions to a list for later solving in confirmParents()
+	 */
 	private void setSettler(LoadedTransaction tx) {
 	    if (settlingTransaction != null)
 	        return; 
@@ -329,6 +378,10 @@ public class LoadedTransaction extends Transaction {
 		}
 	}
 	
+	/**
+	 * reset this confirmed beacon and all it's child confirmed beacons
+	 * As well as the transactions that they confirmed
+	 */
 	private void undoChain() {
 		if(!mainChainMember)
 			return;
@@ -354,7 +407,12 @@ public class LoadedTransaction extends Transaction {
 			mainChainBeaconChild.undoChain();
 	}
 	
-	// iterative version
+	/**
+	 * Remove given settler from this and parent transactions until
+	 * reaching a transaction that hasn't the given beacon as settler
+	 * 
+	 * UndoChain subfunction 
+	 */
 	private void removeSettler(LoadedTransaction settler) {
 		if(settlingTransaction != settler)
 			return;
@@ -383,7 +441,8 @@ public class LoadedTransaction extends Transaction {
 	
 	/**
 	 * Checks if this transaction is a direct child of target transaction
-	 * For this we verify that this transaction has all parent branchs at a higher or equal branch height
+	 * For this we walk backward through the DAG until we find the target transaction or
+	 * reach target transaction height
 	 * 
 	 * @param target The target transaction
 	 * @return true if this transaction is a direct child of target, false otherwise
@@ -443,6 +502,9 @@ public class LoadedTransaction extends Transaction {
 		changeStatus(TxStatus.CONFIRMED);
 	}
 	
+	/**
+	 * Reject this transaction/beacon and subsequent output claimers/child beacons
+	 */
 	public void rejectTx() {
 		changeStatus(TxStatus.REFUSED);
 	
@@ -459,6 +521,9 @@ public class LoadedTransaction extends Transaction {
 		dag.writer.push(this);
 	}
 	
+	/**
+	 * Zawy12's LWMA difficulty algorithm
+	 */
 	private BigInteger calcDifficulty(List<BigInteger> targets, List<Long> solveTimes) {
 		
 		int T = 60;
@@ -506,6 +571,9 @@ public class LoadedTransaction extends Transaction {
 		return height;
 	}
 	
+	/**
+	 * Calculate beacon weight by adding child branches weights 
+	 */
 	public BigInteger getWeight() {
 		BigInteger newWeight = BigInteger.ZERO;
 
@@ -526,6 +594,11 @@ public class LoadedTransaction extends Transaction {
 		return mainChainMember;
 	}
 	
+	/**
+	 * Get transaction (either beacon or normal) confirmations count
+	 * If beacon, get the confirmation count by adding child branches confirmations count
+	 * If normal transaction return the settling transaction's confirmation count, or 0 if no settler yet
+	 */
 	public int confirmationCount() {
 		if(settlingTransaction == null)
 			return 0;

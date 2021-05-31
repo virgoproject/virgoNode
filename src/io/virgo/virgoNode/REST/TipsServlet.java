@@ -5,6 +5,12 @@ import org.json.JSONArray;
 import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 
+/**
+ * REST API Tips servlet
+ * 	<br><br>
+ *  GET Methods:<br>
+ *  /tips
+ */
 public class TipsServlet {
 
 	public static Response GET() {

@@ -9,6 +9,13 @@ import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.DAG.LoadedTransaction;
 
+/**
+ * REST API Beacon servlet
+ * 	<br><br>
+ *  GET Methods:<br>
+ *  /beacon/latest/[count] <br>
+ *  /beacon/{transactionHash}
+ */
 public class beaconServlet {
 
 	public static Response GET(String[] arguments) {
@@ -35,7 +42,7 @@ public class beaconServlet {
 					JSONArray resp = new JSONArray();
 					
 					for(Sha256Hash beaconHash : beacons)
-						beacons.add(beaconHash);
+						resp.put(beaconHash.toString());
 					
 					return new Response(200, resp.toString());
 					
