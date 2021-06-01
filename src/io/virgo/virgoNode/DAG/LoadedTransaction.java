@@ -316,10 +316,10 @@ public class LoadedTransaction extends Transaction {
 			b:
 			for(TxOutput input : conflictingTransaction.loadedInputs) {
 				for(LoadedTransaction claimer : input.claimers)
-					if(claimer != conflictingTransaction &&
-					claimer.getSettlingTransaction().getWeight().compareTo(conflictingTransaction.getSettlingTransaction().getWeight()) >= 0)
+					if(!claimer.equals(conflictingTransaction) && conflictualTxs.contains(claimer)) {
 						canConfirm = false;
 						break b;
+					}
 			}
 			
 			if(canConfirm)
@@ -333,48 +333,67 @@ public class LoadedTransaction extends Transaction {
 	
 	/**
 	 * Settle this transaction and parent transactions with given beacon
-	 * until reaching already settled transactions.
+	 * until reaching already settled transactions (excluding beacons) or mainchain.
 	 * 
 	 * Settling is confirming transactions that aren't conflicting with other
 	 * and adding conflictual transactions to a list for later solving in confirmParents()
 	 */
 	private void setSettler(LoadedTransaction tx) {
-	    if (settlingTransaction != null)
-	        return; 
 		
 		Stack<LoadedTransaction> s = new Stack<LoadedTransaction>();
 		LoadedTransaction tmp;
-		settlingTransaction = tx;
+		
+		if(settlingTransaction == null)
+			settlingTransaction = tx;
 		
 		s.add(this);
 		
 		while(!s.isEmpty()){
 			tmp = s.pop();
 			
-			for(LoadedTransaction inputTx : tmp.loadedInputTxs)
-				if(inputTx.getStatus().isRefused() || inputTx.getOutputsMap().get(getAddress()).isSpent()){
-					tmp.rejectTx();
-					break;
-				}
-			
-			boolean canConfirm = true;
-			for(TxOutput input : tmp.loadedInputs)
-				for(LoadedTransaction claimer : input.claimers)
-					if(claimer != this && !claimer.getStatus().isRefused()) {
-						settlingTransaction.conflictualTxs.add(tmp);
-						canConfirm = false;
-						break;
-					}
-			if(canConfirm)
-				tmp.confirmTx();
-			
+			//if element is from mainchain we don't add it's parents and dont proccess it
+			if(tmp.isMainChainMember())
+				continue;
 			
 			for(LoadedTransaction e : tmp.getLoadedParents()){
+				//if beacon transaction we add it to continue walking but don't change it's settlingTransaction
+				if(e.isBeaconTransaction()) {
+					s.add(e);
+					continue;
+				}
+				
 				if(e.settlingTransaction == null){
 					e.settlingTransaction = tx;
 					s.add(e);
 				}
 			}
+			
+			//if beacon transaction don't process it
+			if(tmp.isBeaconTransaction())
+				continue;
+			
+			boolean canConfirm = true;
+			
+			//if any input is already spent refuse this transaction
+			for(LoadedTransaction inputTx : tmp.loadedInputTxs)
+				if(inputTx.getStatus().isRefused() || inputTx.getOutputsMap().get(tmp.getAddress()).isSpent()){
+					tmp.rejectTx();
+					canConfirm = false;
+					break;
+				}
+			
+			if(canConfirm) {//run only if transaction hasn't been refused on last check
+				b: for(TxOutput input : tmp.loadedInputs)
+					for(LoadedTransaction claimer : input.claimers)
+						if(claimer != this && !claimer.getStatus().isRefused()) {
+							settlingTransaction.conflictualTxs.add(tmp);
+							canConfirm = false;
+							break b;
+						}
+				if(canConfirm)
+					tmp.confirmTx();
+			}
+			
 		}
 	}
 	

@@ -190,9 +190,7 @@ public class TxVerificationPool {
 					//Ensure transaction isn't processed yet
 					if(dag.isLoaded(txHash) || dag.isTxWaiting(txHash))
 						return;
-					
-					System.out.println("received tx");
-					
+										
 					initBeaconTx(txHash, parents, outputs, parentBeacon, nonce, date, saved);
 					
 				//regular transaction
@@ -207,7 +205,7 @@ public class TxVerificationPool {
 					//Ensure transaction isn't processed yet
 					if(dag.isLoaded(txHash) || dag.isTxWaiting(txHash))
 						return;
-					
+										
 					initTx(txHash, sigBytes, pubKey, parents, inputs, outputs, date, saved);
 				}				
 			}catch(Exception e) {
@@ -345,15 +343,11 @@ public class TxVerificationPool {
 			}
 			
 			BigInteger hashValue = new BigInteger(ByteBuffer.wrap(hashPadded).array());
-			
-			System.out.println("checking hash");
-			
+						
 			//check if required difficulty is met
 			if(hashValue.compareTo(Main.MAX_DIFFICULTY.divide(parentBeacon.getDifficulty())) >= 0)
 				return;
-			
-			System.out.println("ok");
-			
+						
 			dag.queue.add(dag.new txTask(tx, loadedParents, parentBeacon));
 		}
 		

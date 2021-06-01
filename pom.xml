@@ -39,7 +39,7 @@
 	<dependency>
 	  <groupId>io.virgo</groupId>
 	  <artifactId>virgoCryptoLib</artifactId>
-	  <version>0.0.5a</version>
+	  <version>0.0.5b</version>
 	</dependency>
    <dependency>
       <groupId>io.virgo</groupId>
