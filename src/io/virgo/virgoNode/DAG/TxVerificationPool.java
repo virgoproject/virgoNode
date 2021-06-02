@@ -236,8 +236,14 @@ public class TxVerificationPool {
 		@Override
 		public void run() {
 			//check if transaction has no useless parent
-			if(loadedParents.size() > 1 && (loadedParents.get(0).isChildOf(loadedParents.get(1)) || loadedParents.get(1).isChildOf(loadedParents.get(0))))
-				return;
+			if(loadedParents.size() > 1)
+				for(LoadedTransaction parent : loadedParents)
+					for(LoadedTransaction otherParent : loadedParents) {
+						if(parent.equals(otherParent))
+							continue;
+						if(parent.isChildOf(otherParent))
+							return;
+					}
 			
 			//Make a list of all input we are child of
 			ArrayList<LoadedTransaction> childOfInputs = new ArrayList<LoadedTransaction>();
@@ -296,8 +302,14 @@ public class TxVerificationPool {
 		@Override
 		public void run() {
 			//check if transaction has no useless parent
-			if(loadedParents.size() > 1 && (loadedParents.get(0).isChildOf(loadedParents.get(1)) || loadedParents.get(1).isChildOf(loadedParents.get(0))))
-				return;
+			if(loadedParents.size() > 1)
+				for(LoadedTransaction parent : loadedParents)
+					for(LoadedTransaction otherParent : loadedParents) {
+						if(parent.equals(otherParent))
+							continue;
+						if(parent.isChildOf(otherParent))
+							return;
+					}
 
 			//check if transaction timestamp is superior to last 10 blocks median and inferior to current time + 15 minutes
 			ArrayList<Long> timestamps = new ArrayList<Long>();

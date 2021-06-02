@@ -243,6 +243,16 @@ public class DAG implements Runnable {
 		if(loadedTransactions.containsKey(tx.getHash()) || waitingTxsHashes.contains(tx.getHash()))
 			return;
 		
+		//Check if we don't try to use an input claimed by a valid parent 
+		for(LoadedTransaction input : loadedInputs) {
+			for(LoadedTransaction claimer : input.getOutputsMap().get(tx.getAddress()).claimers)
+				if(!claimer.getStatus().isRefused())
+					for(LoadedTransaction parent : loadedParents)
+						if(parent.isChildOf(claimer))
+							return;
+			
+		}
+		
 		//load transaction to DAG
 		LoadedTransaction loadedTx = new LoadedTransaction(this, tx, loadedParents.toArray(new LoadedTransaction[loadedParents.size()]), loadedInputs.toArray(new LoadedTransaction[loadedInputs.size()]));
 		
@@ -293,12 +303,8 @@ public class DAG implements Runnable {
 	public ArrayList<Sha256Hash> getBestParents() {
 		ArrayList<Sha256Hash> bestParents = new ArrayList<Sha256Hash>();
 		while(bestParents.size() == 0) {//avoid desync probs, there can't be 0 childLess txs
-			if(childLessTxs.size() == 1) {
-				bestParents.add(childLessTxs.get(0).getHash());
-			}else if(childLessTxs.size() >= 2) {
-				bestParents.add(childLessTxs.get(0).getHash());
-				bestParents.add(childLessTxs.get(1).getHash());
-			}
+			for(LoadedTransaction tx : childLessTxs)
+				bestParents.add(tx.getHash());
 		}
 		
 		return bestParents;
