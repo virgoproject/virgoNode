@@ -13,6 +13,7 @@ import java.util.TimerTask;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import io.virgo.virgoCryptoLib.Sha256Hash;
@@ -169,7 +170,6 @@ public class DAG implements Runnable {
 		if(!waitedTxs.isEmpty()) {
 			addWaitedTxs(waitedTxs, new OrphanTransaction(tx, waitedTxs.toArray(new Sha256Hash[waitedTxs.size()])));
 			loader.push(waitedTxs);
-			System.out.println("laking transaction");
 			return;
 		}
 		
@@ -252,6 +252,13 @@ public class DAG implements Runnable {
 							return;
 			
 		}
+		
+		//transmit tx to peers
+		JSONObject txInv = new JSONObject();	
+		txInv.put("command", "inv");
+		txInv.put("ids", new JSONArray(Arrays.asList(tx.getHash().toString())));
+		
+		Main.getGeoWeb().broadCast(txInv);
 		
 		//load transaction to DAG
 		LoadedTransaction loadedTx = new LoadedTransaction(this, tx, loadedParents.toArray(new LoadedTransaction[loadedParents.size()]), loadedInputs.toArray(new LoadedTransaction[loadedInputs.size()]));
