@@ -44,7 +44,7 @@
    <dependency>
       <groupId>io.virgo</groupId>
       <artifactId>geoWeb</artifactId>
-      <version>0.0.8l</version>
+      <version>0.0.8q</version>
    </dependency>
 	<dependency>
 	  <groupId>io.virgo</groupId>

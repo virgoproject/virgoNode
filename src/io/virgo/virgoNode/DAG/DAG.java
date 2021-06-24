@@ -4,8 +4,6 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Timer;
@@ -33,7 +31,7 @@ public class DAG implements Runnable {
 	private HashMap<Sha256Hash, LoadedTransaction> loadedTransactions = new HashMap<Sha256Hash, LoadedTransaction>();
 	private HashMap<Sha256Hash, List<OrphanTransaction>> waitedTxs = new HashMap<Sha256Hash, List<OrphanTransaction>>();
 	//CopyOnWriteArrayList permits to safely write on theses list with the DAG thread while other threads are reading
-	protected CopyOnWriteArrayList<Sha256Hash> waitingTxsHashes = new CopyOnWriteArrayList<Sha256Hash>();
+	protected ArrayList<Sha256Hash> waitingTxsHashes = new ArrayList<Sha256Hash>();
 	protected CopyOnWriteArrayList<LoadedTransaction> childLessTxs = new CopyOnWriteArrayList<LoadedTransaction>();
 	protected CopyOnWriteArrayList<LoadedTransaction> childLessBeacons = new CopyOnWriteArrayList<LoadedTransaction>();
 
@@ -100,10 +98,11 @@ public class DAG implements Runnable {
 				} catch (InterruptedException e) {}
 				
 				if(waitedTxs.size() != 0) {
-					Collection<Sha256Hash> lakingTransactions = waitedTxs.keySet();
+					ArrayList<Sha256Hash> lakingTransactions = new ArrayList<Sha256Hash>(waitedTxs.keySet());
 					lakingTransactions.removeAll(waitingTxsHashes);
 					Peers.askTxs(lakingTransactions);
 				}
+				
 			}
 			
 		}, 10000, 10000);
@@ -163,7 +162,7 @@ public class DAG implements Runnable {
 		
 		//check for missing parent beacon
 		LoadedTransaction parentBeacon = getLoadedTx(tx.getParentBeaconHash());
-		if(parentBeacon == null)
+		if(parentBeacon == null && !waitedTxs.contains(tx.getParentBeaconHash()))
 			waitedTxs.add(tx.getParentBeaconHash());
 		
 		//if there is any missing transaction (input or parent) try to load them and add this transaction to waiting txs
@@ -285,7 +284,7 @@ public class DAG implements Runnable {
 			if(waitedTxs.containsKey(tx))
 				waitedTxs.get(tx).add(orphanTx);
 			else
-				waitedTxs.put(tx, Collections.synchronizedList(new ArrayList<OrphanTransaction>(Arrays.asList(orphanTx))));
+				waitedTxs.put(tx, new ArrayList<OrphanTransaction>(Arrays.asList(orphanTx)));
 		}
 		
 		waitingTxsHashes.add(orphanTx.getHash());
@@ -297,7 +296,7 @@ public class DAG implements Runnable {
 	private void removeWaitedTx(Sha256Hash tx) {
 		if(!waitedTxs.containsKey(tx))
 			return;
-		
+			
 			for(OrphanTransaction orphanTx : waitedTxs.get(tx))
 				orphanTx.removeWaitedTx(tx, this);
 		

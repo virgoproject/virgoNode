@@ -10,7 +10,7 @@ import io.virgo.virgoCryptoLib.Sha256Hash;
  */
 public class OrphanTransaction extends Transaction {
 	
-	private ArrayList<Sha256Hash> waitedTxs;
+	public ArrayList<Sha256Hash> waitedTxs;
 
 	public OrphanTransaction(Transaction tx, Sha256Hash[] waitedTxs) {
 		super(tx);
@@ -23,7 +23,7 @@ public class OrphanTransaction extends Transaction {
 	 * Remove waited transaction from the list of waited
 	 * If no more transaction waited then try to load 
 	 */
-	public void removeWaitedTx(Sha256Hash tx, DAG dag) {
+	protected void removeWaitedTx(Sha256Hash tx, DAG dag) {
 		waitedTxs.remove(tx);
 		
 		//if no more transaction to wait load this transaction to DAG
