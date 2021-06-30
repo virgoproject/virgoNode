@@ -544,7 +544,7 @@ public class LoadedTransaction extends Transaction {
 	 */
 	private BigInteger calcDifficulty(List<BigInteger> targets, List<Long> solveTimes) {
 		
-		int T = 60;
+		int T = 30;
 		
 		BigInteger sumD = BigInteger.valueOf(0);
 		double sumST = 0;
@@ -556,7 +556,7 @@ public class LoadedTransaction extends Transaction {
 		   sumST += solveTime;
 		}
 		//sumST = 0.75*T*60
-		sumST = 990 + 0.2523*sumST;
+		sumST = 1350 + 0.2523*sumST;
 		return sumD.multiply(BigInteger.valueOf(T)).divide(BigInteger.valueOf((long) sumST));
 		
 	}
