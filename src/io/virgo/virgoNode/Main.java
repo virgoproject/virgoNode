@@ -115,7 +115,11 @@ public class Main {
 
 			@Override
 			public void run() {
-				System.out.print("\r " + txsSec + " txs/s | " + dag.loadedTxsCount() + " in total | " + dag.getPoolSize() + " txs waiting | " + net.getPeers().size() + " peers " + runningIndicators[currentIndicator]);
+				float used = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory())*1f;
+				float memory = used/Runtime.getRuntime().totalMemory()*100f;
+				
+				System.out.print("\r " + txsSec + " txs/s | " + dag.loadedTxsCount() + " in total | " + dag.getPoolSize() + " txs waiting | " + net.getPeers().size() + " peers | " +
+				memory + "% memory " + runningIndicators[currentIndicator]);
 				txsSec = 0;
 				currentIndicator++;
 				if(currentIndicator > 3)

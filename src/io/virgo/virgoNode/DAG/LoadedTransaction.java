@@ -37,6 +37,7 @@ public class LoadedTransaction extends Transaction {
 	
 	//beacon related variables
 	private BigInteger difficulty;
+	private BigInteger floorWeight;
 	private long beaconHeight;
 	private LoadedTransaction loadedParentBeacon;
 	public ArrayList<LoadedTransaction> loadedChildBeacons = new ArrayList<LoadedTransaction>();
@@ -105,6 +106,7 @@ public class LoadedTransaction extends Transaction {
 		
 		//set base difficulty
 		difficulty = BigInteger.valueOf(10000);
+		floorWeight = BigInteger.ZERO;
 		
 		mainChainMember = true;
 		confirmedParents = true;
@@ -114,9 +116,9 @@ public class LoadedTransaction extends Transaction {
 		practical_randomX_key = getHash();
 		
 		//Prefill difficulties and solveTimes with perfect values to smooth first blocks difficulty drop
-		for(int i = 0; i < 22; i++) {
+		for(int i = 0; i < 27; i++) {
 			difficulties.add(difficulty);
-			solveTimes.add(60l);
+			solveTimes.add(30l);
 		}
 		
 		settlingTransaction = this;
@@ -146,6 +148,8 @@ public class LoadedTransaction extends Transaction {
 		
 		beaconHeight = loadedParentBeacon.getBeaconHeight() + 1;
 		
+		floorWeight = loadedParentBeacon.floorWeight.add(loadedParentBeacon.difficulty);
+		
 		dag.childLessBeacons.remove(loadedParentBeacon);
 		dag.childLessBeacons.add(this);
 		
@@ -156,11 +160,11 @@ public class LoadedTransaction extends Transaction {
 		difficulties = loadedParentBeacon.getDifficulties();
 		solveTimes = loadedParentBeacon.getSolveTimes();
 		
-		if(difficulties.size() == 22)
+		if(difficulties.size() == 27)
 			difficulties.remove(0);
 		difficulties.add(difficulty);
 		
-		if(solveTimes.size() == 22)
+		if(solveTimes.size() == 27)
 			solveTimes.remove(0);
 		solveTimes.add((getDate()-loadedParentBeacon.getDate())/1000);
 		
@@ -540,7 +544,7 @@ public class LoadedTransaction extends Transaction {
 	}
 	
 	/**
-	 * Zawy12's LWMA difficulty algorithm
+	 * Zawy's modifed Digishield v3 (tempered SMA) difficulty algorithm
 	 */
 	private BigInteger calcDifficulty(List<BigInteger> targets, List<Long> solveTimes) {
 		
@@ -556,7 +560,7 @@ public class LoadedTransaction extends Transaction {
 		   sumST += solveTime;
 		}
 		//sumST = 0.75*T*60
-		sumST = 1350 + 0.2523*sumST;
+		sumST = 607.5 + 0.2523*sumST;
 		return sumD.multiply(BigInteger.valueOf(T)).divide(BigInteger.valueOf((long) sumST));
 		
 	}
@@ -642,6 +646,10 @@ public class LoadedTransaction extends Transaction {
 	
 	public BigInteger getDifficulty() {
 		return difficulty;
+	}
+	
+	public BigInteger getFloorWeight() {
+		return floorWeight;
 	}
 	
 	private List<BigInteger> getDifficulties(){	

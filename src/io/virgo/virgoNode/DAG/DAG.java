@@ -331,6 +331,11 @@ public class DAG implements Runnable {
 				continue;
 			}
 			
+			if(selectedBeacon.getFloorWeight().compareTo(beacon.getFloorWeight()) < 0) {
+				selectedBeacon = beacon;
+				continue;
+			}
+			
 			if(selectedBeacon.getWeight().compareTo(beacon.getWeight()) < 0) {
 				selectedBeacon = beacon;
 				continue;
