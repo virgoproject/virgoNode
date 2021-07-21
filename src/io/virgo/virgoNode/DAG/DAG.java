@@ -1,10 +1,10 @@
 package io.virgo.virgoNode.DAG;
 
-import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -28,13 +28,17 @@ import io.virgo.virgoNode.network.Peers;
  */
 public class DAG implements Runnable {
 
-	private HashMap<Sha256Hash, LoadedTransaction> loadedTransactions = new HashMap<Sha256Hash, LoadedTransaction>();
+	private LinkedHashMap<Sha256Hash, LoadedTransaction> loadedTransactions = new LinkedHashMap<Sha256Hash, LoadedTransaction>();
 	private HashMap<Sha256Hash, List<OrphanTransaction>> waitedTxs = new HashMap<Sha256Hash, List<OrphanTransaction>>();
 	//CopyOnWriteArrayList permits to safely write on theses list with the DAG thread while other threads are reading
 	protected ArrayList<Sha256Hash> waitingTxsHashes = new ArrayList<Sha256Hash>();
 	protected CopyOnWriteArrayList<LoadedTransaction> childLessTxs = new CopyOnWriteArrayList<LoadedTransaction>();
 	protected CopyOnWriteArrayList<LoadedTransaction> childLessBeacons = new CopyOnWriteArrayList<LoadedTransaction>();
 
+	protected HashMap<String, BeaconBranch> branches = new HashMap<String, BeaconBranch>();
+	protected HashMap<String, TxOutput> outputs = new HashMap<String, TxOutput>();
+
+	
 	LinkedBlockingQueue<txTask> queue = new LinkedBlockingQueue<txTask>();
 	
 	private LoadedTransaction genesis;
@@ -44,14 +48,18 @@ public class DAG implements Runnable {
 	
 	public int saveInterval;
 	
-	final private EventListener eventListener;
+	private EventListener eventListener;
 	
-	final public TxVerificationPool verificationPool;
+	public TxVerificationPool verificationPool;
 	
-	final public DAGInfos infos = new DAGInfos();
+	public DAGInfos infos = new DAGInfos();
 		
-	public DAG(int saveInterval) throws IOException {
+	public DAG(int saveInterval) {
 		this.saveInterval = saveInterval;
+	}
+
+	//DAG thread receives raw verified transactions and try to load them
+	public void run() {
 		
 		//start event listener thread
 		eventListener = new EventListener(this);
@@ -106,11 +114,6 @@ public class DAG implements Runnable {
 			}
 			
 		}, 10000, 10000);
-		
-	}
-
-	//DAG thread receives raw verified transactions and try to load them
-	public void run() {
 		
 		while(!Thread.interrupted()) {
 			

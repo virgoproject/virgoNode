@@ -5,6 +5,8 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.sql.SQLException;
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -92,15 +94,8 @@ public class Main {
 		
 		System.out.println("Creating DAG");
 		
-		//Initialising DAG (transactions data structure)
-		try {
-			dag = new DAG(tipsSaveInterval);
-			new Thread(dag).start();
-		} catch (IOException e) {
-			System.out.println("Enable to create DAG: " + "\n terminating.");
-			e.printStackTrace();
-			return;
-		}
+		dag = new DAG(tipsSaveInterval);
+		new Thread(dag).start();
 		
 		System.out.println("Running REST server on port 8000");
 		try {
@@ -115,11 +110,15 @@ public class Main {
 
 			@Override
 			public void run() {
-				float used = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory())*1f;
-				float memory = used/Runtime.getRuntime().totalMemory()*100f;
+				long used = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+				
+				double usedMB = (double) used / (double)(1024*1024);
+				double maxMB = (double) Runtime.getRuntime().totalMemory() / (double)(1024*1024);
+				
+				NumberFormat formatter = new DecimalFormat("#0.00");
 				
 				System.out.print("\r " + txsSec + " txs/s | " + dag.loadedTxsCount() + " in total | " + dag.getPoolSize() + " txs waiting | " + net.getPeers().size() + " peers | " +
-				memory + "% memory " + runningIndicators[currentIndicator]);
+					formatter.format(usedMB) + "/" + formatter.format(maxMB) + "MB " + runningIndicators[currentIndicator]);
 				txsSec = 0;
 				currentIndicator++;
 				if(currentIndicator > 3)

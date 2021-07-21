@@ -3,6 +3,9 @@ package io.virgo.virgoNode.DAG;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
+
+import io.virgo.virgoNode.Main;
 
 /**
  * DAG sub data-structure simplifying beaconchain graph into branches
@@ -10,10 +13,15 @@ import java.util.List;
  */
 public class BeaconBranch {
 	
+	private String uuid;
+	
 	private ArrayList<LoadedTransaction> transactions = new ArrayList<LoadedTransaction>();
 	private BigInteger branchWeight = BigInteger.ZERO;
 	
-	public BeaconBranch() {}
+	public BeaconBranch() {
+		uuid = UUID.randomUUID().toString();
+		Main.getDAG().branches.put(uuid, this);
+	}
 	
 	/**
 	 * Add a beacon to this branch and return it's displacement
@@ -55,6 +63,10 @@ public class BeaconBranch {
 	
 	public LoadedTransaction getFirst() {
 		return transactions.get(0);
+	}
+
+	public String getUUID() {
+		return uuid;
 	}
 	
 }

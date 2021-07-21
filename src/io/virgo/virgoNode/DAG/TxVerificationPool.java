@@ -342,23 +342,25 @@ public class TxVerificationPool {
 			if(!childOf)
 				return;
 
-			if(!parentBeacon.getRandomXKey().equals(currentVmKey)) {
-				randomX.changeKey(parentBeacon.getRandomXKey().toBytes());
-				currentVmKey = parentBeacon.getRandomXKey();
-			}
-			
-			byte[] txHash = randomX_vm.getHash(tx.getHash().toBytes());
-					
-			byte[] hashPadded = new byte[txHash.length + 1];
-			for (int i = 0; i < txHash.length; i++) {
-				hashPadded[i + 1] = txHash[i];
-			}
-			
-			BigInteger hashValue = new BigInteger(ByteBuffer.wrap(hashPadded).array());
+			if(!tx.isSaved()) {
+				if(!parentBeacon.getRandomXKey().equals(currentVmKey)) {
+					randomX.changeKey(parentBeacon.getRandomXKey().toBytes());
+					currentVmKey = parentBeacon.getRandomXKey();
+				}
+				
+				byte[] txHash = randomX_vm.getHash(tx.getHash().toBytes());
 						
-			//check if required difficulty is met
-			if(hashValue.compareTo(Main.MAX_DIFFICULTY.divide(parentBeacon.getDifficulty())) >= 0)
-				return;
+				byte[] hashPadded = new byte[txHash.length + 1];
+				for (int i = 0; i < txHash.length; i++) {
+					hashPadded[i + 1] = txHash[i];
+				}
+				
+				BigInteger hashValue = new BigInteger(ByteBuffer.wrap(hashPadded).array());
+							
+				//check if required difficulty is met
+				if(hashValue.compareTo(Main.MAX_DIFFICULTY.divide(parentBeacon.getDifficulty())) >= 0)
+					return;
+			}
 						
 			dag.queue.add(dag.new txTask(tx, loadedParents, parentBeacon));
 		}

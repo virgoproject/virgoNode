@@ -124,7 +124,7 @@ public class Database {
 		
 		Statement getTransactionsStmt = conn.createStatement();
 		
-		if(getTransactionsStmt.execute("SELECT * FROM txs")) {
+		if(getTransactionsStmt.execute("SELECT * FROM txs ORDER BY date ASC")) {
 			
 			ResultSet result = getTransactionsStmt.getResultSet();
 			

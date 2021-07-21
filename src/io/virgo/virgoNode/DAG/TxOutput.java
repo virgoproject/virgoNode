@@ -4,6 +4,7 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 import io.virgo.virgoCryptoLib.Converter;
 import io.virgo.virgoCryptoLib.Sha256Hash;
@@ -17,15 +18,21 @@ import io.virgo.virgoNode.Utils.Miscellaneous;
  */
 public class TxOutput {
 
+	private String uuid;
+	
 	private Sha256Hash originTx;
 	private String address;
 	private long amount;
 	public List<LoadedTransaction> claimers = Collections.synchronizedList(new ArrayList<LoadedTransaction>());
 	
 	public TxOutput(String address, long amount, Sha256Hash originTx) {
+		uuid = UUID.randomUUID().toString();
+		
 		this.address = address;
 		this.amount = amount;
 		this.originTx = originTx;
+		
+		Main.getDAG().outputs.put(uuid, this);
 	}
 	
 	/**
@@ -47,6 +54,10 @@ public class TxOutput {
 			return new TxOutput(outArgs[0], value, originTx);
 		
 		throw new IllegalArgumentException("Can't build a TxOutput from this string.");
+	}
+	
+	public String getUUID() {
+		return uuid;
 	}
 	
 	public String toString() {

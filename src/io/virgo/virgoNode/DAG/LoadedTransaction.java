@@ -6,6 +6,10 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Stack;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import java.util.Map.Entry;
 
 import io.virgo.virgoCryptoLib.Sha256Hash;
@@ -21,9 +25,7 @@ public class LoadedTransaction extends Transaction {
 	private DAG dag;
 	
 	LinkedHashMap<BeaconBranch, BigInteger> beaconBranchs = new LinkedHashMap<BeaconBranch, BigInteger>();//branch displacement
-	
-	public ArrayList<Sha256Hash> childs = new ArrayList<Sha256Hash>();
-	
+		
 	private ArrayList<LoadedTransaction> loadedParents = new ArrayList<LoadedTransaction>();
 	
 	private int height = 0;
@@ -40,17 +42,20 @@ public class LoadedTransaction extends Transaction {
 	private BigInteger floorWeight;
 	private long beaconHeight;
 	private LoadedTransaction loadedParentBeacon;
+	private ArrayList<Sha256Hash> childBeacons = new ArrayList<Sha256Hash>(); 
 	public ArrayList<LoadedTransaction> loadedChildBeacons = new ArrayList<LoadedTransaction>();
 	private boolean mainChainMember = false;
 	private boolean confirmedParents = false;
+	private ArrayList<Sha256Hash> conflictualTxsHashes = new ArrayList<Sha256Hash>();
 	private ArrayList<LoadedTransaction> conflictualTxs = new ArrayList<LoadedTransaction>();
-	private List<Long> solveTimes = new ArrayList<Long>();//solveTimes of the last 22 parent blocks
-	private List<BigInteger> difficulties = new ArrayList<BigInteger>();//difficulties of the last 22 parent blocks
+	private List<Long> solveTimes = new ArrayList<Long>();//solveTimes of the last 27 parent blocks
+	private List<BigInteger> difficulties = new ArrayList<BigInteger>();//difficulties of the last 27 parent blocks
 	
 	private Sha256Hash randomX_key = null;
 	private Sha256Hash practical_randomX_key = null;
 	
 	private LoadedTransaction settlingTransaction;
+	private Sha256Hash settlingTransactionHash;
 	
 	/**
 	 * Basic transaction constructor
@@ -68,17 +73,13 @@ public class LoadedTransaction extends Transaction {
 		for(LoadedTransaction inputTx : inputTxs) {
 			TxOutput out = inputTx.getOutputsMap().get(getAddress());
 			out.claimers.add(this);
-			loadedInputs.add(out);
 			inputsValue += out.getAmount();
 		}
 		
 		//Add this transaction to tips list
 		dag.childLessTxs.add(this);
 		
-		for(LoadedTransaction parent : loadedParents) {
-			//add this transaction to parents's child list
-			parent.addChild(this);
-			
+		for(LoadedTransaction parent : loadedParents) {			
 			//Remove parent from tips list if in it
 			dag.childLessTxs.remove(parent);
 		}
@@ -122,6 +123,7 @@ public class LoadedTransaction extends Transaction {
 		}
 		
 		settlingTransaction = this;
+		settlingTransactionHash = getHash();
 		
 		//create base beacon branch
 		BeaconBranch beaconBranch = new BeaconBranch();
@@ -140,11 +142,13 @@ public class LoadedTransaction extends Transaction {
 		this.dag = dag;
 		
 		settlingTransaction = this;
+		settlingTransactionHash = getHash();
 		
 		this.loadedParents.addAll(Arrays.asList(parents));
 		
 		this.loadedParentBeacon = parentBeacon;
 		loadedParentBeacon.loadedChildBeacons.add(this);
+		loadedParentBeacon.childBeacons.add(getHash());
 		
 		beaconHeight = loadedParentBeacon.getBeaconHeight() + 1;
 		
@@ -191,10 +195,7 @@ public class LoadedTransaction extends Transaction {
 		//Add this transaction to tips list
 		dag.childLessTxs.add(this);
 		
-		for(LoadedTransaction parent : loadedParents) {
-			//add this transaction to parents's child list
-			parent.addChild(this);
-			
+		for(LoadedTransaction parent : loadedParents) {			
 			//Remove parent from tips list if in it
 			dag.childLessTxs.remove(parent);
 		}
@@ -221,7 +222,7 @@ public class LoadedTransaction extends Transaction {
 	 */
 	private void setupBeaconBranch() {
 		
-		if(loadedParentBeacon.childs.size() == 1) {//transaction is parent's first child, make part of parent's main branch
+		if(loadedParentBeacon.childBeacons.size() == 1) {//transaction is parent's first child, make part of parent's main branch
 			BeaconBranch parentMainBranch = loadedParentBeacon.getMainBeaconBranch();
 			beaconBranchs.put(parentMainBranch, parentMainBranch.addTx(this));
 		} else {
@@ -346,8 +347,10 @@ public class LoadedTransaction extends Transaction {
 		Stack<LoadedTransaction> s = new Stack<LoadedTransaction>();
 		LoadedTransaction tmp;
 		
-		if(settlingTransaction == null)
+		if(settlingTransaction == null) {
 			settlingTransaction = tx;
+			settlingTransactionHash = tx.getHash();
+		}
 		
 		s.add(this);
 		
@@ -367,6 +370,7 @@ public class LoadedTransaction extends Transaction {
 				
 				if(e.settlingTransaction == null){
 					e.settlingTransaction = tx;
+					e.settlingTransactionHash = tx.getHash();
 					s.add(e);
 				}
 			}
@@ -390,6 +394,7 @@ public class LoadedTransaction extends Transaction {
 					for(LoadedTransaction claimer : input.claimers)
 						if(claimer != this && !claimer.getStatus().isRefused()) {
 							settlingTransaction.conflictualTxs.add(tmp);
+							settlingTransaction.conflictualTxsHashes.add(tmp.getHash());
 							canConfirm = false;
 							break b;
 						}
@@ -412,6 +417,7 @@ public class LoadedTransaction extends Transaction {
 		mainChainMember = false;
 		confirmedParents = false;
 		conflictualTxs.clear();
+		conflictualTxsHashes.clear();
 		
 		for(LoadedTransaction parent : loadedParents)
 			parent.removeSettler(this);
@@ -443,6 +449,8 @@ public class LoadedTransaction extends Transaction {
 		s.add(this);
 		
 		settlingTransaction = null;
+		settlingTransactionHash = null;
+		
 		changeStatus(TxStatus.PENDING);
 		
 		while(!s.isEmpty())
@@ -455,6 +463,8 @@ public class LoadedTransaction extends Transaction {
 					continue;
 				
 				parent.settlingTransaction = null;
+				parent.settlingTransactionHash = null;
+				
 				parent.changeStatus(TxStatus.PENDING);
 				s.add(parent);
 			}
@@ -505,10 +515,6 @@ public class LoadedTransaction extends Transaction {
 	    }
         
         return false;
-	}
-	
-	synchronized public void addChild(LoadedTransaction child) {
-		childs.add(child.getHash());
 	}
 	
 	private void changeStatus(TxStatus newStatus) {
@@ -662,6 +668,68 @@ public class LoadedTransaction extends Transaction {
 	
 	public Sha256Hash getRandomXKey() {
 		return practical_randomX_key;
+	}
+	
+	public JSONObject toJSONObject() {
+		JSONObject baseJSON = ((Transaction) this).toJSONObject();
+		
+		baseJSON.put("height", height);
+		
+		JSONArray outputsIds = new JSONArray();
+		for(TxOutput output : getOutputsMap().values())
+			outputsIds.put(output.getUUID());
+		baseJSON.put("outputsIds", outputsIds);
+		
+		if(isBeaconTransaction()) {
+		
+			JSONArray branches = new JSONArray();
+			for(BeaconBranch branch : beaconBranchs.keySet())
+				branches.put(branch.getUUID());
+			baseJSON.put("branches", branches);
+			
+			baseJSON.put("floorWeight", floorWeight.toString());
+			baseJSON.put("beaconHeight", beaconHeight);
+			
+			JSONArray childBeaconsHashes = new JSONArray();
+			for(Sha256Hash hash : childBeacons)
+				childBeaconsHashes.put(hash.toString());
+			baseJSON.put("childBeacons", childBeaconsHashes);
+			
+			baseJSON.put("mainChainMember", mainChainMember);
+			baseJSON.put("confirmedParents", confirmedParents);
+			
+			JSONArray conflictualHashes = new JSONArray();
+			for(Sha256Hash hash : conflictualTxsHashes)
+				conflictualHashes.put(hash);
+			baseJSON.put("conflictualTxs", conflictualHashes);
+			
+			JSONArray diffs = new JSONArray();
+			for(BigInteger diff : difficulties)
+				diffs.put(diff.toString());
+			baseJSON.put("diffs", diffs);
+			
+			JSONArray times = new JSONArray();
+			for(long solveTime : solveTimes)
+				times.put(solveTime);
+			baseJSON.put("solveTimes", times);
+			
+			baseJSON.put("RXKey", randomX_key.toString());
+			baseJSON.put("PrRXKey", practical_randomX_key);
+			
+		}else {
+			JSONArray inputsIds = new JSONArray();
+			for(TxOutput input : loadedInputs)
+				inputsIds.put(input.getUUID());
+			baseJSON.put("inputsIds", inputsIds);
+		}
+		
+		if(settlingTransactionHash != null)
+			baseJSON.put("settlingTransaction", settlingTransactionHash.toString());
+		
+		baseJSON.remove("inputs");
+		baseJSON.remove("outputs");
+		
+		return baseJSON;
 	}
 	
 }
