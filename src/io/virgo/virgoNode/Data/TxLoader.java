@@ -1,7 +1,6 @@
 package io.virgo.virgoNode.Data;
 
 import java.sql.SQLException;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -41,7 +40,7 @@ public class TxLoader implements Runnable{
 					else throw new JSONException("");
 					
 				} catch (JSONException | SQLException | IllegalArgumentException e) {
-					Peers.askTxs(Arrays.asList(txUid));
+					Peers.askParents(txUid, Main.getDAG().getTips()[0].getHash());
 				}				
 				
 			} catch (InterruptedException e) {

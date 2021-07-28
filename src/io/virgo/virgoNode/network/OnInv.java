@@ -10,6 +10,7 @@ import io.virgo.virgoNode.Main;
 public class OnInv {
 
 	public static void handle(JSONObject messageJson, Peer peer) {
+		
 		JSONArray txs = messageJson.getJSONArray("ids");
 		
 		JSONArray wantedTxs = new JSONArray();
@@ -22,7 +23,7 @@ public class OnInv {
 		
 		if(wantedTxs.length() == 0)
 			return;
-		
+				
 		JSONObject invResp = new JSONObject();	
 		invResp.put("command", "getTxs");
 		invResp.put("ids", wantedTxs);

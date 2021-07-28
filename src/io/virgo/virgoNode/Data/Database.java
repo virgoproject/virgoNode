@@ -6,6 +6,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Map;
 
 import org.json.JSONArray;
@@ -13,6 +14,7 @@ import org.json.JSONObject;
 
 import io.virgo.virgoCryptoLib.Converter;
 import io.virgo.virgoCryptoLib.Sha256Hash;
+import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.DAG.DAG;
 import io.virgo.virgoNode.DAG.Transaction;
 import io.virgo.virgoNode.DAG.TxOutput;
@@ -115,6 +117,84 @@ public class Database {
         }
         
         return null;
+	}
+	
+	public ArrayList<Sha256Hash> getInsertedAfter(Sha256Hash txHash) throws SQLException {
+		
+		ArrayList<Sha256Hash> txsHashes = new ArrayList<Sha256Hash>();
+		
+		long date = -1l;
+		
+		if(!txHash.equals(Main.getDAG().getGenesis().getHash())) {
+			PreparedStatement stmt = conn.prepareStatement("SELECT date FROM txs WHERE id=?");
+			stmt.setString(1, txHash.toString());
+			
+			ResultSet res = stmt.executeQuery();
+			
+			if(res.next())
+				date = res.getLong("date");
+			
+		}else {
+			date = 0l;
+		}
+		
+		if(date != -1l) {
+			PreparedStatement stmt2 = conn.prepareStatement("SELECT id FROM txs WHERE date>? ORDER BY date ASC LIMIT 500");
+			stmt2.setLong(1, date);
+			
+			ResultSet result = stmt2.executeQuery();
+			
+			while(result.next())
+				txsHashes.add(new Sha256Hash(result.getString("id")));
+		}
+		
+		return txsHashes; 
+		
+	}
+	
+	public ArrayList<Sha256Hash> getInsertedBefore(Sha256Hash txHash, Sha256Hash maxAncestorHash) throws SQLException {
+		
+		ArrayList<Sha256Hash> txsHashes = new ArrayList<Sha256Hash>();
+
+		if(!txHash.equals(Main.getDAG().getGenesis().getHash()) && !maxAncestorHash.equals(Main.getDAG().getGenesis().getHash())) {
+		
+			long max = 0l;
+			long min = 0l;
+			
+			PreparedStatement stmt = conn.prepareStatement("SELECT date FROM txs WHERE id=?");
+			stmt.setString(1, txHash.toString());
+			
+			ResultSet res = stmt.executeQuery();
+			
+			if(res.next())
+				max = res.getLong("date");
+			else return txsHashes;
+			
+			
+			stmt = conn.prepareStatement("SELECT date FROM txs WHERE id=?");
+			stmt.setString(1, maxAncestorHash.toString());
+			
+			res = stmt.executeQuery();
+			
+			if(res.next())
+				min = res.getLong("date");
+			
+			if(min > max)
+				min = 0l;
+			
+			stmt = conn.prepareStatement("SELECT id FROM txs WHERE date<? AND date>? ORDER BY date ASC LIMIT 500");
+			stmt.setLong(1, max);
+			stmt.setLong(2, min);
+			
+			res = stmt.executeQuery();
+			
+			while(res.next())
+				txsHashes.add(new Sha256Hash(res.getString("id")));
+			
+		}
+		
+		return txsHashes;
+		
 	}
 	
 	/**

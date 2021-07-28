@@ -3,7 +3,7 @@ package io.virgo.virgoNode.DAG;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.concurrent.Executors;
+import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -20,6 +20,7 @@ import io.virgo.virgoCryptoLib.Sha256;
 import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.Utils.Miscellaneous;
+import io.virgo.virgoNode.Utils.PriorityQueueThreadPoolExecutor;
 
 /**
  * Thread pool charged of verifying transactions before submitting them to the DAG handling thread
@@ -28,7 +29,7 @@ public class TxVerificationPool {
 
 	private DAG dag;
 	
-	private ThreadPoolExecutor pool;
+	private PriorityQueueThreadPoolExecutor pool;
 	
 	private Sha256Hash currentVmKey;
 	private RandomX randomX;
@@ -37,8 +38,7 @@ public class TxVerificationPool {
 	public TxVerificationPool(DAG dag) {
 		this.dag = dag;
 		
-		pool = (ThreadPoolExecutor) Executors.newFixedThreadPool(Math.max(1, Runtime.getRuntime().availableProcessors()-2));
-		pool.setKeepAliveTime(600000, TimeUnit.MILLISECONDS);
+		pool = new PriorityQueueThreadPoolExecutor(Math.max(1, Runtime.getRuntime().availableProcessors()-2));
 		
 		randomX = new RandomX.Builder().build();
 		
@@ -152,8 +152,7 @@ public class TxVerificationPool {
 				
 		return new CleanedTx(cleanedParents, cleanedInputs, cleanedOutputs);
 	}
-	
-	
+
 	/**
 	 * Runnable building and verifying a transaction validity from JSON
 	 */
@@ -230,11 +229,12 @@ public class TxVerificationPool {
 			this.loadedParents = loadedParents;
 			this.loadedInputs = loadedInputs;
 			
-			pool.submit(this);
+			pool.submit(this, 10);
 		}
 		
 		@Override
 		public void run() {
+			
 			//check if transaction has no useless parent
 			if(loadedParents.size() > 1)
 				for(LoadedTransaction parent : loadedParents)
@@ -296,11 +296,14 @@ public class TxVerificationPool {
 			this.parentBeacon = parentBeacon;
 			this.loadedParents = loadedParents;
 			
-			pool.submit(this);
+			pool.submit(this, 10);
 		}
 		
 		@Override
 		public void run() {
+			if(tx.getParentBeaconHash().equals(Main.getDAG().getGenesis().getHash()))
+				System.out.println(System.currentTimeMillis());
+			
 			//check if transaction has no useless parent
 			if(loadedParents.size() > 1)
 				for(LoadedTransaction parent : loadedParents)
@@ -343,23 +346,27 @@ public class TxVerificationPool {
 				return;
 
 			if(!tx.isSaved()) {
-				if(!parentBeacon.getRandomXKey().equals(currentVmKey)) {
-					randomX.changeKey(parentBeacon.getRandomXKey().toBytes());
-					currentVmKey = parentBeacon.getRandomXKey();
-				}
 				
-				byte[] txHash = randomX_vm.getHash(tx.getHash().toBytes());
-						
-				byte[] hashPadded = new byte[txHash.length + 1];
-				for (int i = 0; i < txHash.length; i++) {
-					hashPadded[i + 1] = txHash[i];
-				}
+				synchronized(randomX) {
+					if(!parentBeacon.getRandomXKey().equals(currentVmKey)) {
+						randomX.changeKey(parentBeacon.getRandomXKey().toBytes());
+						currentVmKey = parentBeacon.getRandomXKey();
+					}
+					
+					byte[] txHash = randomX_vm.getHash(tx.getHash().toBytes());
 				
-				BigInteger hashValue = new BigInteger(ByteBuffer.wrap(hashPadded).array());
-							
-				//check if required difficulty is met
-				if(hashValue.compareTo(Main.MAX_DIFFICULTY.divide(parentBeacon.getDifficulty())) >= 0)
-					return;
+				
+					byte[] hashPadded = new byte[txHash.length + 1];
+					for (int i = 0; i < txHash.length; i++) {
+						hashPadded[i + 1] = txHash[i];
+					}
+					
+					BigInteger hashValue = new BigInteger(ByteBuffer.wrap(hashPadded).array());
+								
+					//check if required difficulty is met
+					if(hashValue.compareTo(Main.MAX_DIFFICULTY.divide(parentBeacon.getDifficulty())) >= 0)
+						return;
+				}
 			}
 						
 			dag.queue.add(dag.new txTask(tx, loadedParents, parentBeacon));

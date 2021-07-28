@@ -55,7 +55,7 @@ public class Main {
 	public static void main(String[] none) {
 		
 		System.out.println(getAppName()+"\n"
-				+ "Visit https://virgocoin.io for more informations !");
+				+ "Visit https://virgo.net for more informations !");
 		
 		loadConfig();
 		
@@ -78,7 +78,7 @@ public class Main {
 					.netID(netId)
 					.peerCountTarget(peerCountTarget)
 					.messageHandler(new NetMessageHandler())
-					.maxMessageThreadPoolSize(500)
+					.maxMessageThreadPoolSize(1)
 					.build();
 			
 		} catch (IllegalArgumentException | IOException e) {
@@ -113,7 +113,7 @@ public class Main {
 				long used = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
 				
 				double usedMB = (double) used / (double)(1024*1024);
-				double maxMB = (double) Runtime.getRuntime().totalMemory() / (double)(1024*1024);
+				double maxMB = (double) Runtime.getRuntime().maxMemory() / (double)(1024*1024);
 				
 				NumberFormat formatter = new DecimalFormat("#0.00");
 				

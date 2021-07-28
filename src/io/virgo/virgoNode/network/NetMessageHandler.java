@@ -41,6 +41,22 @@ public class NetMessageHandler extends MessageHandler {
 					OnTips.handle(messageJson, peer);
 					break;
 					
+				case "getChilds":
+					OnGetChilds.handle(messageJson, peer);
+					break;
+					
+				case "childs":
+					OnChilds.handle(messageJson, peer);
+					break;
+					
+				case "getParents":
+					OnGetParents.handle(messageJson, peer);
+					break;
+					
+				case "parents":
+					OnParents.handle(messageJson, peer);
+					break;
+				
 				case "getNodeInfos":
 					OnGetNodeInfos.handle(messageJson, peer);
 			}

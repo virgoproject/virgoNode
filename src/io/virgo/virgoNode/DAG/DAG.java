@@ -3,13 +3,15 @@ package io.virgo.virgoNode.DAG;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -39,7 +41,7 @@ public class DAG implements Runnable {
 	protected HashMap<String, TxOutput> outputs = new HashMap<String, TxOutput>();
 
 	
-	LinkedBlockingQueue<txTask> queue = new LinkedBlockingQueue<txTask>();
+	PriorityBlockingQueue<txTask> queue;
 	
 	private LoadedTransaction genesis;
 	
@@ -53,13 +55,42 @@ public class DAG implements Runnable {
 	public TxVerificationPool verificationPool;
 	
 	public DAGInfos infos = new DAGInfos();
+	
+	public boolean isFirst = true;
+	
+    private static final AtomicInteger taskCounter = new AtomicInteger(0);
 		
-	public DAG(int saveInterval) {
+	public DAG(int saveInterval) {		
 		this.saveInterval = saveInterval;
+		
+		//setup comparator for task prioritisation 
+		Comparator<txTask> comparator = new Comparator<txTask>() {
+
+			@Override
+			public int compare(txTask arg0, txTask arg1) {
+				int res = arg1.priority - arg0.priority;
+				if(res != 0)
+					return res;
+				
+				long datediff = arg0.tx.getDate() - arg1.tx.getDate();
+				
+				if(datediff < 0)
+					return -1;
+				else if(datediff > 0)
+					return 1;
+				
+				return arg0.taskNumber - arg1.taskNumber;
+			}
+			
+		};
+		
+		queue = new PriorityBlockingQueue<txTask>(100, comparator);
 	}
 
 	//DAG thread receives raw verified transactions and try to load them
 	public void run() {
+		
+
 		
 		//start event listener thread
 		eventListener = new EventListener(this);
@@ -99,18 +130,29 @@ public class DAG implements Runnable {
 
 			@Override
 			public void run() {
-				Peers.getTips();
-				
 				try {
-					Thread.sleep(5000);
-				} catch (InterruptedException e) {}
-				
-				if(waitedTxs.size() != 0) {
-					ArrayList<Sha256Hash> lakingTransactions = new ArrayList<Sha256Hash>(waitedTxs.keySet());
-					lakingTransactions.removeAll(waitingTxsHashes);
-					Peers.askTxs(lakingTransactions);
-				}
-				
+					
+					int i = 0;
+					
+					while(true) {
+						if(i >= childLessTxs.size())
+							break;
+						
+						Peers.askChilds(childLessTxs.get(i).getHash());
+						i++;
+						
+						Thread.sleep(10000);
+					}
+					
+					
+					
+					if(waitedTxs.size() != 0) {
+						ArrayList<Sha256Hash> lakingTransactions = new ArrayList<Sha256Hash>(waitedTxs.keySet());
+						lakingTransactions.removeAll(waitingTxsHashes);
+						Peers.askTxs(lakingTransactions);
+					}
+					
+				} catch (Exception e) {}
 			}
 			
 		}, 10000, 10000);
@@ -165,6 +207,7 @@ public class DAG implements Runnable {
 		
 		//check for missing parent beacon
 		LoadedTransaction parentBeacon = getLoadedTx(tx.getParentBeaconHash());
+		
 		if(parentBeacon == null && !waitedTxs.contains(tx.getParentBeaconHash()))
 			waitedTxs.add(tx.getParentBeaconHash());
 		
@@ -174,6 +217,9 @@ public class DAG implements Runnable {
 			loader.push(waitedTxs);
 			return;
 		}
+		
+		if(tx.getParentBeaconHash().equals(Main.getDAG().getGenesis().getHash()))
+			System.out.println(System.currentTimeMillis());
 		
 		verificationPool.new beaconVerificationTask(tx, parentBeacon, loadedParents);
 	}
@@ -447,11 +493,14 @@ public class DAG implements Runnable {
 	
 	
 	public class txTask {
-		
+				
 		Transaction tx = null;
 		ArrayList<LoadedTransaction> loadedParents = null;
 		ArrayList<LoadedTransaction> loadedInputs = null;
 		LoadedTransaction parentBeacon = null;
+		
+		int priority = 0;
+		int taskNumber = taskCounter.incrementAndGet();
 				
 		public txTask(Transaction tx) {
 			this.tx = tx;
@@ -460,13 +509,15 @@ public class DAG implements Runnable {
 		public txTask(Transaction tx, ArrayList<LoadedTransaction> loadedParents, LoadedTransaction parentBeacon) {
 			this.tx = tx;
 			this.loadedParents = loadedParents;
-			this.parentBeacon = parentBeacon;		
+			this.parentBeacon = parentBeacon;
+			priority = 2;
 		}
 		
 		public txTask(Transaction tx, ArrayList<LoadedTransaction> loadedParents, ArrayList<LoadedTransaction> loadedInputs) {
 			this.tx = tx;
 			this.loadedParents = loadedParents;
-			this.loadedInputs = loadedInputs;		
+			this.loadedInputs = loadedInputs;
+			priority = 2;
 		}
 		
 	}

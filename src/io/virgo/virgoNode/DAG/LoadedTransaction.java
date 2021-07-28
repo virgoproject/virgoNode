@@ -670,8 +670,8 @@ public class LoadedTransaction extends Transaction {
 		return practical_randomX_key;
 	}
 	
-	public JSONObject toJSONObject() {
-		JSONObject baseJSON = ((Transaction) this).toJSONObject();
+	public JSONObject JSONState() {
+		JSONObject baseJSON = toJSONObject();
 		
 		baseJSON.put("height", height);
 		

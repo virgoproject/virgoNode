@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
+import java.util.concurrent.Executors;
 
 import com.sun.net.httpserver.HttpServer;
 
@@ -63,17 +64,21 @@ public class Server {
         		}
             	exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
                 exchange.sendResponseHeaders(response.getResponseCode(), response.getResponseBodyBytes().length);
+                
                 OutputStream output = exchange.getResponseBody();
                 output.write(response.getResponseBodyBytes());
+                
                 output.flush();
-                exchange.close();
+                output.close();
         		
         	} else {
         		exchange.sendResponseHeaders(405, -1);// 405 Method Not Allowed
         	}
         	
+            exchange.close();
+        	
         }));
-        server.setExecutor(null); // creates a default executor
+        server.setExecutor(Executors.newCachedThreadPool()); // creates a default executor
         server.start();
 	}
 	
