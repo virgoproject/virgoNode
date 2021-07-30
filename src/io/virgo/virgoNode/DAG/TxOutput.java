@@ -23,7 +23,7 @@ public class TxOutput {
 	private Sha256Hash originTx;
 	private String address;
 	private long amount;
-	public List<LoadedTransaction> claimers = Collections.synchronizedList(new ArrayList<LoadedTransaction>());
+	public List<Transaction> claimers = Collections.synchronizedList(new ArrayList<Transaction>());
 	
 	public TxOutput(String address, long amount, Sha256Hash originTx) {
 		uuid = UUID.randomUUID().toString();
@@ -78,8 +78,8 @@ public class TxOutput {
 	}
 
 	public boolean isSpent() {
-		for(LoadedTransaction claimer : claimers) {
-			if(claimer.getStatus().isConfirmed())
+		for(Transaction claimer : claimers) {
+			if(claimer.getLoaded().getStatus().isConfirmed())
 				return true;
 		}
 		return false;

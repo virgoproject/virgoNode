@@ -15,7 +15,7 @@ public class BeaconBranch {
 	
 	private String uuid;
 	
-	private ArrayList<LoadedTransaction> transactions = new ArrayList<LoadedTransaction>();
+	private ArrayList<Transaction> transactions = new ArrayList<Transaction>();
 	private BigInteger branchWeight = BigInteger.ZERO;
 	
 	public BeaconBranch() {
@@ -46,7 +46,7 @@ public class BeaconBranch {
 		return branchWeight;
 	}
 	
-	public int indexOf(LoadedTransaction transaction) {
+	public int indexOf(Transaction transaction) {
 		return transactions.indexOf(transaction);
 	}
 	
@@ -57,11 +57,11 @@ public class BeaconBranch {
 	/**
 	 * Get a list of transactions added before a specified transaction, including the given transaction
 	 */
-	public List<LoadedTransaction> getMembersBefore(LoadedTransaction transaction) {
-		return transactions.subList(0, transactions.indexOf(transaction)+1);
+	public List<Transaction> getMembersBefore(Transaction loadedParentBeacon) {
+		return transactions.subList(0, transactions.indexOf(loadedParentBeacon)+1);
 	}
 	
-	public LoadedTransaction getFirst() {
+	public Transaction getFirst() {
 		return transactions.get(0);
 	}
 

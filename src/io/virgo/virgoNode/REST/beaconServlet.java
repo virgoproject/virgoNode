@@ -30,13 +30,13 @@ public class beaconServlet {
 						wanted = Math.min(Math.abs(Integer.parseInt(arguments[1])), 100);
 					
 					ArrayList<Sha256Hash> beacons = new ArrayList<Sha256Hash>();
-					LoadedTransaction currentBeacon = Main.getDAG().getBestTipBeacon().getParentBeacon();
+					LoadedTransaction currentBeacon = Main.getDAG().getBestTipBeacon().getParentBeacon().getLoaded();
 					for(int i = 0; i < wanted; i++) {
 						beacons.add(currentBeacon.getHash());
 						if(currentBeacon.getParentBeacon() == null)
 							break;
 						
-						currentBeacon = currentBeacon.getParentBeacon();
+						currentBeacon = currentBeacon.getParentBeacon().getLoaded();
 					}
 
 					JSONArray resp = new JSONArray();

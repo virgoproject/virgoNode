@@ -7,6 +7,7 @@ import org.json.JSONObject;
 import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.DAG.LoadedTransaction;
+import io.virgo.virgoNode.DAG.Transaction;
 import io.virgo.virgoNode.DAG.TxOutput;
 
 /**
@@ -81,7 +82,7 @@ public class TxServlet {
 						txState.put("status", tx.getStatus().ordinal());
 						txState.put("confirmations", tx.confirmationCount());
 						
-						LoadedTransaction settler = tx.getSettlingTransaction();
+						LoadedTransaction settler = tx.getSettlingTransaction().getLoaded();
 						
 						if(settler != null)
 							txState.put("beacon", settler.getHash().toString());
@@ -99,10 +100,10 @@ public class TxServlet {
 							
 							JSONArray outClaimers = new JSONArray();
 							
-							for(LoadedTransaction claimer : out.claimers) {
+							for(Transaction claimer : out.claimers) {
 								JSONObject outClaimer = new JSONObject();
 								outClaimer.put("id", claimer.getHash().toString());
-								outClaimer.put("status", claimer.getStatus().getCode());
+								outClaimer.put("status", claimer.getLoaded().getStatus().getCode());
 								outClaimers.put(outClaimer);
 							}
 							

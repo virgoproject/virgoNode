@@ -30,7 +30,7 @@ import io.virgo.virgoNode.network.Peers;
  */
 public class DAG implements Runnable {
 
-	private LinkedHashMap<Sha256Hash, LoadedTransaction> loadedTransactions = new LinkedHashMap<Sha256Hash, LoadedTransaction>();
+	private LinkedHashMap<Sha256Hash, Transaction> loadedTransactions = new LinkedHashMap<Sha256Hash, Transaction>();
 	private HashMap<Sha256Hash, List<OrphanTransaction>> waitedTxs = new HashMap<Sha256Hash, List<OrphanTransaction>>();
 	//CopyOnWriteArrayList permits to safely write on theses list with the DAG thread while other threads are reading
 	protected ArrayList<Sha256Hash> waitingTxsHashes = new ArrayList<Sha256Hash>();
@@ -159,7 +159,7 @@ public class DAG implements Runnable {
 					int r = 50;
 					
 					for(int j = 0; i < r; i++) {
-						selected = selected.getLoadedParent(0);
+						selected = selected.getLoaded().getLoadedParent(0).getLoaded();
 					}
 					
 					System.out.println("going3");
@@ -197,6 +197,14 @@ public class DAG implements Runnable {
 	}
 	
 	public LoadedTransaction getLoadedTx(Sha256Hash hash) {
+		Transaction tx = loadedTransactions.get(hash);
+		if(tx != null)
+			return tx.getLoaded();
+		
+		return null;
+	}
+	
+	public Transaction getTx(Sha256Hash hash) {
 		return loadedTransactions.get(hash);
 	}
 	
@@ -305,11 +313,14 @@ public class DAG implements Runnable {
 		
 		//Check if we don't try to use an input claimed by a valid parent 
 		for(LoadedTransaction input : loadedInputs) {
-			for(LoadedTransaction claimer : input.getOutputsMap().get(tx.getAddress()).claimers)
-				if(!claimer.getStatus().isRefused())
+			for(Transaction claimer : input.getOutputsMap().get(tx.getAddress()).claimers) {
+				LoadedTransaction loadedClaimer = claimer.getLoaded();
+				if(!loadedClaimer.getStatus().isRefused())
 					for(LoadedTransaction parent : loadedParents)
-						if(parent.isChildOf(claimer))
+						if(parent.isChildOf(loadedClaimer))
 							return;
+			}
+
 			
 		}
 		

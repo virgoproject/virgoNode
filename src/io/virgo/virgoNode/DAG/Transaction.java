@@ -42,6 +42,8 @@ public class Transaction {
 	
 	private boolean isSaved;
 	
+	LoadedTransaction loadedTx = null;
+	
 	/**
 	 * Basic transaction constructor
 	 */
@@ -133,6 +135,7 @@ public class Transaction {
 		this.isGenesis = baseTransaction.isGenesis();
 		this.parentBeaconHash = baseTransaction.getParentBeaconHash();
 		this.nonce = baseTransaction.getNonce();
+		this.loadedTx = baseTransaction.loadedTx;
 	}
 
 
@@ -292,6 +295,10 @@ public class Transaction {
 			
 		}
 		
+	}
+
+	public LoadedTransaction getLoaded() {
+		return loadedTx;
 	}
 	
 }

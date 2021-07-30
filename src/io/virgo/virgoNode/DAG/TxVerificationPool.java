@@ -314,11 +314,14 @@ public class TxVerificationPool {
 			LoadedTransaction currentParent = parentBeacon;
 			for(int i = 0; i < 10; i++) {
 				timestamps.add(currentParent.getDate());
-				currentParent = currentParent.getParentBeacon();
+				Transaction newParent = currentParent.getLoaded().getParentBeacon();
 				
 				//for first 10 blocks
-				if(currentParent == null)
+				if(newParent == null)
 					break;
+				
+				currentParent = newParent.getLoaded();
+				
 			}
 			
 			timestamps.sort(null);
