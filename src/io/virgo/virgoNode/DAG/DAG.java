@@ -100,7 +100,7 @@ public class DAG implements Runnable {
 		TxOutput out = new TxOutput("V2N5tYdd1Cm1xqxQDsY15x9ED8kyAUvjbWv", (long) (100000 * Math.pow(10, Main.DECIMALS)), new Sha256Hash("025a6f04e7047b713aaba7fc5003c8266302918c25d1526507becad795b01f3a"));
 		TxOutput[] genesisOutputs = {out};
 		
-		genesis = new LoadedTransaction(this, genesisOutputs);
+		genesis = new LoadedTransaction(genesisOutputs);
 		loadedTransactions.put(genesis.getHash(), genesis);
 		childLessTxs.add(genesis);
 		
@@ -144,7 +144,7 @@ public class DAG implements Runnable {
 						Thread.sleep(10000);
 					}
 					
-					
+					System.out.println("going1");
 					
 					if(waitedTxs.size() != 0) {
 						ArrayList<Sha256Hash> lakingTransactions = new ArrayList<Sha256Hash>(waitedTxs.keySet());
@@ -152,7 +152,22 @@ public class DAG implements Runnable {
 						Peers.askTxs(lakingTransactions);
 					}
 					
-				} catch (Exception e) {}
+					System.out.println("going2 " + childLessTxs.size());
+					
+					LoadedTransaction selected = childLessTxs.get(0);
+					
+					int r = 50;
+					
+					for(int j = 0; i < r; i++) {
+						selected = selected.getLoadedParent(0);
+					}
+					
+					System.out.println("going3");
+					System.out.println("mange mes couilles " + selected.JSONState());
+					
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
 			}
 			
 		}, 10000, 10000);
@@ -218,9 +233,6 @@ public class DAG implements Runnable {
 			return;
 		}
 		
-		if(tx.getParentBeaconHash().equals(Main.getDAG().getGenesis().getHash()))
-			System.out.println(System.currentTimeMillis());
-		
 		verificationPool.new beaconVerificationTask(tx, parentBeacon, loadedParents);
 	}
 	
@@ -232,7 +244,7 @@ public class DAG implements Runnable {
 			return;
 		
 		//load transaction to DAG
-		LoadedTransaction loadedTx = new LoadedTransaction(this, tx, loadedParents.toArray(new LoadedTransaction[loadedParents.size()]), parentBeacon);
+		LoadedTransaction loadedTx = new LoadedTransaction(tx, loadedParents.toArray(new LoadedTransaction[loadedParents.size()]), parentBeacon);
 		loadedTransactions.put(loadedTx.getHash(), loadedTx);
 		
 		//save transaction if not done yet
@@ -309,7 +321,7 @@ public class DAG implements Runnable {
 		Main.getGeoWeb().broadCast(txInv);
 		
 		//load transaction to DAG
-		LoadedTransaction loadedTx = new LoadedTransaction(this, tx, loadedParents.toArray(new LoadedTransaction[loadedParents.size()]), loadedInputs.toArray(new LoadedTransaction[loadedInputs.size()]));
+		LoadedTransaction loadedTx = new LoadedTransaction(tx, loadedParents.toArray(new LoadedTransaction[loadedParents.size()]), loadedInputs.toArray(new LoadedTransaction[loadedInputs.size()]));
 		
 		loadedTransactions.put(loadedTx.getHash(), loadedTx);
 		

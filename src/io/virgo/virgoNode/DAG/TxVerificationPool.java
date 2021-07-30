@@ -3,9 +3,6 @@ package io.virgo.virgoNode.DAG;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.concurrent.PriorityBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -301,8 +298,6 @@ public class TxVerificationPool {
 		
 		@Override
 		public void run() {
-			if(tx.getParentBeaconHash().equals(Main.getDAG().getGenesis().getHash()))
-				System.out.println(System.currentTimeMillis());
 			
 			//check if transaction has no useless parent
 			if(loadedParents.size() > 1)

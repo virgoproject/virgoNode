@@ -12,7 +12,9 @@ import org.json.JSONObject;
 
 import java.util.Map.Entry;
 
+import io.virgo.virgoCryptoLib.Converter;
 import io.virgo.virgoCryptoLib.Sha256Hash;
+import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.DAG.Events.TransactionLoadedEvent;
 import io.virgo.virgoNode.DAG.Events.TransactionStatusChangedEvent;
 
@@ -21,8 +23,6 @@ import io.virgo.virgoNode.DAG.Events.TransactionStatusChangedEvent;
  * Extends base transaction
  */
 public class LoadedTransaction extends Transaction {
-	
-	private DAG dag;
 	
 	LinkedHashMap<BeaconBranch, BigInteger> beaconBranchs = new LinkedHashMap<BeaconBranch, BigInteger>();//branch displacement
 		
@@ -48,7 +48,7 @@ public class LoadedTransaction extends Transaction {
 	private boolean confirmedParents = false;
 	private ArrayList<Sha256Hash> conflictualTxsHashes = new ArrayList<Sha256Hash>();
 	private ArrayList<LoadedTransaction> conflictualTxs = new ArrayList<LoadedTransaction>();
-	private List<Long> solveTimes = new ArrayList<Long>();//solveTimes of the last 27 parent blocks
+	private List<Integer> solveTimes = new ArrayList<Integer>();//solveTimes of the last 27 parent blocks
 	private List<BigInteger> difficulties = new ArrayList<BigInteger>();//difficulties of the last 27 parent blocks
 	
 	private Sha256Hash randomX_key = null;
@@ -60,11 +60,9 @@ public class LoadedTransaction extends Transaction {
 	/**
 	 * Basic transaction constructor
 	 */
-	public LoadedTransaction(DAG dag, Transaction baseTransaction, LoadedTransaction[] parents, LoadedTransaction[] inputTxs) {
+	public LoadedTransaction(Transaction baseTransaction, LoadedTransaction[] parents, LoadedTransaction[] inputTxs) {
 		
 		super(baseTransaction);
-		
-		this.dag = dag;
 		
 		this.loadedParents.addAll(Arrays.asList(parents));
 		this.loadedInputTxs.addAll(Arrays.asList(inputTxs));
@@ -77,11 +75,11 @@ public class LoadedTransaction extends Transaction {
 		}
 		
 		//Add this transaction to tips list
-		dag.childLessTxs.add(this);
+		Main.getDAG().childLessTxs.add(this);
 		
 		for(LoadedTransaction parent : loadedParents) {			
 			//Remove parent from tips list if in it
-			dag.childLessTxs.remove(parent);
+			Main.getDAG().childLessTxs.remove(parent);
 		}
 		
 		//determine transaction height (highest parent+1)
@@ -92,16 +90,14 @@ public class LoadedTransaction extends Transaction {
 				if(parent.getHeight() > height-1)
 					height = parent.getHeight() + 1;
 		
-		dag.getEventListener().notify(new TransactionLoadedEvent(this));
+		Main.getDAG().getEventListener().notify(new TransactionLoadedEvent(this));
 	}
 	
 	/**
 	 * genesis constructor
 	 */
-	public LoadedTransaction(DAG dag, TxOutput[] genesisOutputs) {
+	public LoadedTransaction(TxOutput[] genesisOutputs) {
 		super(genesisOutputs);
-		
-		this.dag = dag;
 		
 		status = TxStatus.CONFIRMED;
 		
@@ -111,7 +107,7 @@ public class LoadedTransaction extends Transaction {
 		
 		mainChainMember = true;
 		confirmedParents = true;
-		dag.childLessBeacons.add(this);
+		Main.getDAG().childLessBeacons.add(this);
 		
 		randomX_key = getHash();
 		practical_randomX_key = getHash();
@@ -119,7 +115,7 @@ public class LoadedTransaction extends Transaction {
 		//Prefill difficulties and solveTimes with perfect values to smooth first blocks difficulty drop
 		for(int i = 0; i < 27; i++) {
 			difficulties.add(difficulty);
-			solveTimes.add(30l);
+			solveTimes.add(30);
 		}
 		
 		settlingTransaction = this;
@@ -130,16 +126,14 @@ public class LoadedTransaction extends Transaction {
 		beaconBranch.addTx(this);
 		beaconBranchs.put(beaconBranch, BigInteger.ZERO);
 		
-		dag.getEventListener().notify(new TransactionLoadedEvent(this));
+		Main.getDAG().getEventListener().notify(new TransactionLoadedEvent(this));
 	}
 	
 	/**
 	 * Beacon transaction constructor
 	 */
-	public LoadedTransaction(DAG dag, Transaction baseTransaction, LoadedTransaction[] parents, LoadedTransaction parentBeacon) {
+	public LoadedTransaction(Transaction baseTransaction, LoadedTransaction[] parents, LoadedTransaction parentBeacon) {
 		super(baseTransaction);
-		
-		this.dag = dag;
 		
 		settlingTransaction = this;
 		settlingTransactionHash = getHash();
@@ -154,8 +148,8 @@ public class LoadedTransaction extends Transaction {
 		
 		floorWeight = loadedParentBeacon.floorWeight.add(loadedParentBeacon.difficulty);
 		
-		dag.childLessBeacons.remove(loadedParentBeacon);
-		dag.childLessBeacons.add(this);
+		Main.getDAG().childLessBeacons.remove(loadedParentBeacon);
+		Main.getDAG().childLessBeacons.add(this);
 		
 		//Calculate next beacon difficulty
 		difficulty = calcDifficulty(loadedParentBeacon.getDifficulties(), loadedParentBeacon.getSolveTimes());
@@ -170,7 +164,7 @@ public class LoadedTransaction extends Transaction {
 		
 		if(solveTimes.size() == 27)
 			solveTimes.remove(0);
-		solveTimes.add((getDate()-loadedParentBeacon.getDate())/1000);
+		solveTimes.add((int)(getDate()-loadedParentBeacon.getDate())/1000);
 		
 		//Change the randomX key to this transaction hash if if it is a multiple of 2048
 		if(beaconHeight % 2048 == 0)
@@ -193,11 +187,11 @@ public class LoadedTransaction extends Transaction {
 		
 		
 		//Add this transaction to tips list
-		dag.childLessTxs.add(this);
+		Main.getDAG().childLessTxs.add(this);
 		
 		for(LoadedTransaction parent : loadedParents) {			
 			//Remove parent from tips list if in it
-			dag.childLessTxs.remove(parent);
+			Main.getDAG().childLessTxs.remove(parent);
 		}
 		
 		//determine transaction height (highest parent+1)
@@ -211,7 +205,7 @@ public class LoadedTransaction extends Transaction {
 		
 		setupBeaconBranch();
 		
-		dag.getEventListener().notify(new TransactionLoadedEvent(this));
+		Main.getDAG().getEventListener().notify(new TransactionLoadedEvent(this));
 	}
 	
 	/**
@@ -520,7 +514,7 @@ public class LoadedTransaction extends Transaction {
 	private void changeStatus(TxStatus newStatus) {
 		TxStatus formerStatus = status;
 		status = newStatus;
-		dag.getEventListener().notify(new TransactionStatusChangedEvent(this, formerStatus));
+		Main.getDAG().getEventListener().notify(new TransactionStatusChangedEvent(this, formerStatus));
 	}
 	
 	/**
@@ -546,20 +540,20 @@ public class LoadedTransaction extends Transaction {
 	}
 	
 	public void save() {
-		dag.writer.push(this);
+		Main.getDAG().writer.push(this);
 	}
 	
 	/**
 	 * Zawy's modifed Digishield v3 (tempered SMA) difficulty algorithm
 	 */
-	private BigInteger calcDifficulty(List<BigInteger> targets, List<Long> solveTimes) {
+	private BigInteger calcDifficulty(List<BigInteger> targets, List<Integer> solveTimes) {
 		
 		int T = 30;
 		
 		BigInteger sumD = BigInteger.valueOf(0);
 		double sumST = 0;
 		
-		for (long solveTime : solveTimes) { 
+		for (int solveTime : solveTimes) { 
 			sumD = sumD.add(targets.get(solveTimes.indexOf(solveTime))); 
 		   if (solveTime > 7*T) {solveTime = 7*T; }
 		   if (solveTime < -6*T) {solveTime = -6*T; }
@@ -662,12 +656,66 @@ public class LoadedTransaction extends Transaction {
 		return new ArrayList<BigInteger>(difficulties);
 	}
 	
-	private List<Long> getSolveTimes(){		
-		return new ArrayList<Long>(solveTimes);
+	private List<Integer> getSolveTimes(){		
+		return new ArrayList<Integer>(solveTimes);
 	}
 	
 	public Sha256Hash getRandomXKey() {
 		return practical_randomX_key;
+	}
+	
+	public LoadedTransaction(JSONObject state) {
+		
+		super(Transaction.fromState(state));
+		
+		height = state.getInt("height");
+		
+		if(isBeaconTransaction()) {
+						
+			JSONArray branchesIDs = state.getJSONArray("branches");
+			
+			//first retrieve main branch and put in map with it's modifier
+			BigInteger mainBranchModifier = new BigInteger(Converter.hexToBytes(state.getString("mainBranchModifier")));
+			beaconBranchs.put(Main.getDAG().branches.get(branchesIDs.get(0)), mainBranchModifier);
+			
+			for(int i = 1; i < branchesIDs.length(); i++)
+				beaconBranchs.put(Main.getDAG().branches.get(branchesIDs.get(i)), BigInteger.ZERO);
+			
+			
+			floorWeight = new BigInteger(Converter.hexToBytes(state.getString("floorWeight")));
+			beaconHeight = state.getLong("beaconHeight");
+			
+			JSONArray childBeaconsJSON = state.getJSONArray("childBeacons");
+			for(int i = 0; i < childBeaconsJSON.length(); i++)
+				childBeacons.add(new Sha256Hash(childBeaconsJSON.getString(i)));
+			
+			mainChainMember = state.getBoolean("mainChainMember");
+			confirmedParents = state.getBoolean("confirmedParents");
+			
+			JSONArray conflictualTxsJSON = state.getJSONArray("conflictualTxs");
+			for(int i = 0; i < conflictualTxsJSON.length(); i++)
+				conflictualTxsHashes.add(new Sha256Hash(conflictualTxsJSON.getString(i)));
+			
+			JSONArray diffs = state.getJSONArray("diffs");
+			for(int i = 0; i < diffs.length(); i++)
+				difficulties.add(new BigInteger(Converter.hexToBytes(diffs.getString(i))));
+			
+			JSONArray times = state.getJSONArray("solveTimes");
+			for(int i = 0; i < times.length(); i++)
+				solveTimes.add(times.getInt(i));
+			
+			randomX_key = new Sha256Hash(state.getString("RXKey"));
+			practical_randomX_key = new Sha256Hash(state.getString("PrRXKey"));
+			
+		}else {
+			JSONArray inputsIds = state.getJSONArray("inputsIds");
+			for(int i = 0; i < inputsIds.length(); i++)
+				loadedInputs.add(Main.getDAG().outputs.get(inputsIds.getString(i)));
+		}
+		
+		if(state.has("settlingTransaction"))
+			settlingTransactionHash = new Sha256Hash(state.getString("settlingTransaction"));
+		
 	}
 	
 	public JSONObject JSONState() {
@@ -687,7 +735,9 @@ public class LoadedTransaction extends Transaction {
 				branches.put(branch.getUUID());
 			baseJSON.put("branches", branches);
 			
-			baseJSON.put("floorWeight", floorWeight.toString());
+			baseJSON.put("mainBranchModifier", Converter.bytesToHex(beaconBranchs.get(getMainBeaconBranch()).toByteArray()));
+			
+			baseJSON.put("floorWeight", Converter.bytesToHex(floorWeight.toByteArray()));
 			baseJSON.put("beaconHeight", beaconHeight);
 			
 			JSONArray childBeaconsHashes = new JSONArray();
@@ -705,7 +755,7 @@ public class LoadedTransaction extends Transaction {
 			
 			JSONArray diffs = new JSONArray();
 			for(BigInteger diff : difficulties)
-				diffs.put(diff.toString());
+				diffs.put(Converter.bytesToHex(diff.toByteArray()));
 			baseJSON.put("diffs", diffs);
 			
 			JSONArray times = new JSONArray();
@@ -725,9 +775,6 @@ public class LoadedTransaction extends Transaction {
 		
 		if(settlingTransactionHash != null)
 			baseJSON.put("settlingTransaction", settlingTransactionHash.toString());
-		
-		baseJSON.remove("inputs");
-		baseJSON.remove("outputs");
 		
 		return baseJSON;
 	}
