@@ -2,9 +2,9 @@ package io.virgo.virgoNode.DAG;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Stack;
 
 import org.json.JSONArray;
@@ -13,6 +13,7 @@ import org.json.JSONObject;
 import java.util.Map.Entry;
 
 import io.virgo.virgoCryptoLib.Converter;
+import io.virgo.virgoCryptoLib.ECDSASignature;
 import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.DAG.Events.TransactionLoadedEvent;
@@ -22,7 +23,11 @@ import io.virgo.virgoNode.DAG.Events.TransactionStatusChangedEvent;
  * Object representing a loaded Transaction
  * Extends base transaction
  */
-public class LoadedTransaction extends Transaction {
+public class LoadedTransaction {
+	
+	Transaction baseTransaction;
+	
+	long lastAccessed = System.currentTimeMillis();
 	
 	LinkedHashMap<BeaconBranch, BigInteger> beaconBranchs = new LinkedHashMap<BeaconBranch, BigInteger>();//branch displacement
 		
@@ -59,23 +64,23 @@ public class LoadedTransaction extends Transaction {
 	 */
 	public LoadedTransaction(Transaction baseTransaction, LoadedTransaction[] parents, LoadedTransaction[] inputTxs) {
 		
-		super(baseTransaction);
-		loadedTx = this;
-		
-		this.loadedParents.addAll(Arrays.asList(parents));
-		this.loadedInputTxs.addAll(Arrays.asList(inputTxs));
+		this.baseTransaction = baseTransaction;
+		baseTransaction.loadedTx = this;
+		Main.getDAG().loadedTransactions.add(this);
 		
 		//calculate inputs value
 		for(LoadedTransaction inputTx : inputTxs) {
+			loadedInputTxs.add(inputTx.baseTransaction);
 			TxOutput out = inputTx.getOutputsMap().get(getAddress());
-			out.claimers.add(this);
+			out.claimers.add(baseTransaction);
 			inputsValue += out.getAmount();
 		}
 		
 		//Add this transaction to tips list
 		Main.getDAG().childLessTxs.add(this);
 		
-		for(LoadedTransaction parent : parents) {			
+		for(LoadedTransaction parent : parents) {	
+			loadedParents.add(parent.baseTransaction);
 			//Remove parent from tips list if in it
 			Main.getDAG().childLessTxs.remove(parent);
 		}
@@ -95,8 +100,8 @@ public class LoadedTransaction extends Transaction {
 	 * genesis constructor
 	 */
 	public LoadedTransaction(TxOutput[] genesisOutputs) {
-		super(genesisOutputs);
-		loadedTx = this;
+		baseTransaction = new Transaction(genesisOutputs);
+		baseTransaction.loadedTx = this;
 		
 		status = TxStatus.CONFIRMED;
 		
@@ -117,7 +122,7 @@ public class LoadedTransaction extends Transaction {
 			solveTimes.add(30);
 		}
 		
-		settlingTransaction = this;
+		settlingTransaction = baseTransaction;
 		
 		//create base beacon branch
 		BeaconBranch beaconBranch = new BeaconBranch();
@@ -131,17 +136,17 @@ public class LoadedTransaction extends Transaction {
 	 * Beacon transaction constructor
 	 */
 	public LoadedTransaction(Transaction baseTransaction, LoadedTransaction[] parents, LoadedTransaction parentBeacon) {
-		super(baseTransaction);
-		loadedTx = this;
+		this.baseTransaction = baseTransaction;
+		baseTransaction.loadedTx = this;
+		Main.getDAG().loadedTransactions.add(this);
+
 		
-		settlingTransaction = this;
+		settlingTransaction = baseTransaction;
+				
+		this.loadedParentBeacon = parentBeacon.baseTransaction;
+		parentBeacon.loadedChildBeacons.add(baseTransaction);
 		
-		this.loadedParents.addAll(Arrays.asList(parents));
-		
-		this.loadedParentBeacon = parentBeacon;
-		parentBeacon.loadedChildBeacons.add(this);
-		
-		beaconHeight = parentBeacon.getLoaded().getBeaconHeight() + 1;
+		beaconHeight = parentBeacon.getBeaconHeight() + 1;
 		
 		floorWeight = parentBeacon.floorWeight.add(parentBeacon.difficulty);
 		
@@ -173,7 +178,7 @@ public class LoadedTransaction extends Transaction {
 		 * Get the randomX key 64 beacons behind and use it for the next beacon
 		 * So there is a 64 beacons delay between randomX key change and effectiveness
 		 */
-		Transaction beacon64old = this;
+		Transaction beacon64old = this.baseTransaction;
 		for(int i = 0; i < 64; i++) {
 			if(beacon64old.isGenesis())
 				break;
@@ -186,7 +191,8 @@ public class LoadedTransaction extends Transaction {
 		//Add this transaction to tips list
 		Main.getDAG().childLessTxs.add(this);
 		
-		for(LoadedTransaction parent : parents) {			
+		for(LoadedTransaction parent : parents) {
+			loadedParents.add(parent.baseTransaction);
 			//Remove parent from tips list if in it
 			Main.getDAG().childLessTxs.remove(parent);
 		}
@@ -341,7 +347,7 @@ public class LoadedTransaction extends Transaction {
 		LoadedTransaction tmp;
 		
 		if(settlingTransaction == null)
-			settlingTransaction = tx;
+			settlingTransaction = tx.baseTransaction;
 		
 		s.add(this);
 		
@@ -361,7 +367,7 @@ public class LoadedTransaction extends Transaction {
 				}
 				
 				if(t.settlingTransaction == null){
-					t.settlingTransaction = tx;
+					t.settlingTransaction = tx.baseTransaction;
 					s.add(t);
 				}
 			}
@@ -385,7 +391,7 @@ public class LoadedTransaction extends Transaction {
 					for(Transaction claimer : input.claimers) {
 						LoadedTransaction loadedClaimer = claimer.getLoaded();
 						if(loadedClaimer != this && !loadedClaimer.getStatus().isRefused()) {
-							settlingTransaction.getLoaded().conflictualTxs.add(tmp);
+							settlingTransaction.getLoaded().conflictualTxs.add(tmp.baseTransaction);
 							canConfirm = false;
 							break b;
 						}
@@ -434,7 +440,7 @@ public class LoadedTransaction extends Transaction {
 	 * UndoChain subfunction 
 	 */
 	private void removeSettler(LoadedTransaction settler) {
-		if(settlingTransaction != settler)
+		if(settlingTransaction != settler.baseTransaction)
 			return;
 		
 		Stack<LoadedTransaction> s = new Stack<LoadedTransaction>();
@@ -451,7 +457,7 @@ public class LoadedTransaction extends Transaction {
 			for(Transaction parent : tmp.loadedParents)
 			{
 				LoadedTransaction loadedParent = parent.getLoaded();
-				if(loadedParent.settlingTransaction != settler)
+				if(loadedParent.settlingTransaction != settler.baseTransaction)
 					continue;
 				
 				loadedParent.settlingTransaction = null;
@@ -537,9 +543,9 @@ public class LoadedTransaction extends Transaction {
 			for(Transaction childBeacon : loadedChildBeacons)
 				childBeacon.getLoaded().rejectTx();
 	}
-	
+
 	public void save() {
-		Main.getDAG().writer.push(this);
+		Main.getDAG().writer.push(baseTransaction);
 	}
 	
 	/**
@@ -562,6 +568,100 @@ public class LoadedTransaction extends Transaction {
 		sumST = 607.5 + 0.2523*sumST;
 		return sumD.multiply(BigInteger.valueOf(T)).divide(BigInteger.valueOf((long) sumST));
 		
+	}
+	
+	public Sha256Hash getHash() {
+		return baseTransaction.getHash();
+	}
+	
+	public String getAddress() {
+		return baseTransaction.getAddress();
+	}
+	
+	public boolean isGenesis() {
+		return baseTransaction.isGenesis();
+	}
+	
+	public ECDSASignature getSignature() {
+		return baseTransaction.getSignature();
+	}
+	
+	public byte[] getPublicKey() {
+		return baseTransaction.getPublicKey();
+	}
+	
+	public boolean isSaved() {
+		return baseTransaction.isSaved();
+	}
+	
+	public boolean isBeaconTransaction() {
+		return baseTransaction.isBeaconTransaction();
+	}
+
+	public long getOutputsValue() {
+		return baseTransaction.getOutputsValue();
+	}
+	
+	public Sha256Hash[] getParentsHashes() {
+		return baseTransaction.getParentsHashes();
+	}
+	
+	public ArrayList<String> getParentsHashesStrings() {
+		return baseTransaction.getParentsHashesStrings();
+	}
+	
+	public Sha256Hash[] getInputsHashes() {
+		return baseTransaction.getInputsHashes();
+	}
+	
+	public ArrayList<String> getInputsHashesStrings() {
+		return baseTransaction.getInputsHashesStrings();
+	}
+	
+	public Sha256Hash getParentBeaconHash() {
+		return baseTransaction.getParentBeaconHash();
+	}
+	
+	public String getParentBeaconHashString() {
+		return baseTransaction.getParentBeaconHashString();
+	}
+	
+	public byte[] getNonce() {
+		return baseTransaction.getNonce();
+	}
+	
+	public LinkedHashMap<String, TxOutput> getOutputsMap() {
+		return baseTransaction.getOutputsMap();
+	}
+
+	public long getDate() {
+		return baseTransaction.getDate();
+	}
+	
+	/**
+	 * @return JSON representation of the transaction
+	 */
+	public JSONObject toJSONObject() {
+		JSONObject txJson = new JSONObject();
+		txJson.put("parents", new JSONArray(getParentsHashesStrings()));
+		
+		if(!isBeaconTransaction()) {
+			txJson.put("sig", getSignature().toHexString());
+			txJson.put("pubKey", Converter.bytesToHex(getPublicKey()));
+			txJson.put("inputs", new JSONArray(getInputsHashesStrings()));
+		} else {
+			txJson.put("parentBeacon", getParentBeaconHashString());
+			txJson.put("nonce", Converter.bytesToHex(getNonce()));
+		}
+		
+		JSONArray outputsJson = new JSONArray();
+		for(Map.Entry<String, TxOutput> entry : getOutputsMap().entrySet())
+		   outputsJson.put(entry.getValue().toString());
+		txJson.put("outputs", outputsJson);
+		
+		txJson.put("date", getDate());
+		
+		return txJson;
 	}
 	
 	public BeaconBranch getMainBeaconBranch() {
@@ -630,7 +730,7 @@ public class LoadedTransaction extends Transaction {
 		int confirmations = 0;
 		for(Entry<BeaconBranch, BigInteger> branchEntry : beaconBranchs.entrySet())
 			if(branchEntry.getKey().equals(getMainBeaconBranch()))
-				confirmations += branchEntry.getKey().getBranchConfirmations() - branchEntry.getKey().indexOf(this);
+				confirmations += branchEntry.getKey().getBranchConfirmations() - branchEntry.getKey().indexOf(baseTransaction);
 			else
 				confirmations += branchEntry.getKey().getFirst().getLoaded().confirmationCount();
 		
@@ -663,9 +763,11 @@ public class LoadedTransaction extends Transaction {
 		return practical_randomX_key;
 	}
 	
-	public LoadedTransaction(JSONObject state) {
+	public LoadedTransaction(JSONObject state, Transaction baseTransaction) {
 		
-		super(Transaction.fromState(state));
+		this.baseTransaction = baseTransaction;
+		baseTransaction.loadedTx = this;
+		Main.getDAG().loadedTransactions.add(this);
 		
 		height = state.getInt("height");
 		

@@ -26,6 +26,7 @@ public class OnGetTxs {
 		JSONObject getTxsResp = new JSONObject();	
 		getTxsResp.put("command", "txs");
 		getTxsResp.put("txs", foundTxs);
+		getTxsResp.put("relay", true);
 		
 		peer.respondToMessage(getTxsResp, messageJson);
 		

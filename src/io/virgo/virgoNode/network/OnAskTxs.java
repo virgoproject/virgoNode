@@ -22,7 +22,7 @@ public class OnAskTxs {
 
 		if(foundTxs.length() == 0)
 			return;
-			
+					
 		JSONObject resp = new JSONObject();	
 		resp.put("command", "txs");
 		resp.put("txs", foundTxs);

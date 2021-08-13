@@ -5,7 +5,10 @@ import java.util.ArrayList;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import io.virgo.geoWeb.GeoWeb;
 import io.virgo.geoWeb.Peer;
+import io.virgo.geoWeb.ResponseCode;
+import io.virgo.geoWeb.SyncMessageResponse;
 import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 
@@ -14,28 +17,41 @@ public class OnChilds {
 	public static void handle(JSONObject messageJson, Peer peer) {
 		
 		try {
+
+			JSONArray childsJSON = messageJson.getJSONArray("childs");
 			
-			JSONArray childs = messageJson.getJSONArray("childs");
+			ArrayList<String> childs = new ArrayList<String>();
+			for(int i = 0; i < childsJSON.length(); i++)
+				childs.add(childsJSON.getString(i));
 			
-			ArrayList<Sha256Hash> lakingTxs = new ArrayList<Sha256Hash>();
-			for(int i = 0; i < childs.length(); i++) {
-				Sha256Hash child = new Sha256Hash(childs.getString(i));
+			ArrayList<String> lakingTxs = new ArrayList<String>();
+			for(String childHashStr : childs) {
+				Sha256Hash child = new Sha256Hash(childHashStr);
 				
 				if(!Main.getDAG().hasTransaction(child))
-					lakingTxs.add(child);
-					
+					lakingTxs.add(childHashStr);				
 			}
 			
-			if(lakingTxs.size() > 0)
-				Peers.askTxs(lakingTxs);
-								
-			JSONArray tips = messageJson.getJSONArray("tips");
-			
-			for(int i = 0; i < tips.length(); i++) {
-				Sha256Hash tip = new Sha256Hash(tips.getString(i));
+			if(lakingTxs.size() > 0) {
+				JSONObject message = new JSONObject();
+				message.put("command", "askTxs");
+				message.put("ids", new JSONArray(lakingTxs));
 				
-				if(!Main.getDAG().hasTransaction(tip) && !lakingTxs.contains(tip))
-					Peers.askChilds(lakingTxs.get(lakingTxs.size()-1));
+				SyncMessageResponse resp = peer.sendSyncMessage(message);
+				
+				if(resp.getResponseCode().equals(ResponseCode.OK))
+					((NetMessageHandler) GeoWeb.getInstance().getMessageHandler()).onMessage(resp.getResponse(), peer);
+				
+				JSONArray tips = messageJson.getJSONArray("tips");
+				
+				for(int i = 0; i < tips.length(); i++) {
+					Sha256Hash tip = new Sha256Hash(tips.getString(i));
+					
+					if(!Main.getDAG().isLoaded(tip) && !childs.contains(tip.toString())) {
+						Peers.askChilds(new Sha256Hash(childs.get(childs.size()-1)));
+						break;
+					}
+				}
 			}
 			
 		}catch(Exception e) {}

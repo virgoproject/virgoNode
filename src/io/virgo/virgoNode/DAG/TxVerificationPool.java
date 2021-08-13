@@ -3,6 +3,7 @@ package io.virgo.virgoNode.DAG;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -18,6 +19,7 @@ import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.Utils.Miscellaneous;
 import io.virgo.virgoNode.Utils.PriorityQueueThreadPoolExecutor;
+import io.virgo.virgoNode.network.Peers;
 
 /**
  * Thread pool charged of verifying transactions before submitting them to the DAG handling thread
@@ -157,10 +159,12 @@ public class TxVerificationPool {
 
 		JSONObject txJson;
 		boolean saved;
+		boolean relay;
 		
-		public jsonVerificationTask(JSONObject txJson, boolean saved) {
+		public jsonVerificationTask(JSONObject txJson, boolean saved, boolean relay) {
 			this.txJson = txJson;
 			this.saved = saved;
+			this.relay = relay;
 			pool.submit(this);
 		}
 		
@@ -184,8 +188,13 @@ public class TxVerificationPool {
 							parentBeacon.toBytes(), Miscellaneous.longToBytes(date), nonce));
 					
 					//Ensure transaction isn't processed yet
-					if(dag.isLoaded(txHash) || dag.isTxWaiting(txHash))
+					if(dag.isLoaded(txHash) || dag.isTxWaiting(txHash)) {
+						System.out.println(txHash.toString() + "Already laoded");
 						return;
+					}
+
+					if(relay)
+						Peers.invite(Arrays.asList(txHash));
 										
 					initBeaconTx(txHash, parents, outputs, parentBeacon, nonce, date, saved);
 					
@@ -199,8 +208,13 @@ public class TxVerificationPool {
 							(parents.toString() + inputs.toString() + outputs.toString()).getBytes(), pubKey, Miscellaneous.longToBytes(date)));
 					
 					//Ensure transaction isn't processed yet
-					if(dag.isLoaded(txHash) || dag.isTxWaiting(txHash))
+					if(dag.isLoaded(txHash) || dag.isTxWaiting(txHash)) {
+						System.out.println(txHash.toString() + "Already laoded");
 						return;
+					}
+					
+					if(relay)
+						Peers.invite(Arrays.asList(txHash));
 										
 					initTx(txHash, sigBytes, pubKey, parents, inputs, outputs, date, saved);
 				}				
@@ -314,7 +328,7 @@ public class TxVerificationPool {
 			LoadedTransaction currentParent = parentBeacon;
 			for(int i = 0; i < 10; i++) {
 				timestamps.add(currentParent.getDate());
-				Transaction newParent = currentParent.getLoaded().getParentBeacon();
+				Transaction newParent = currentParent.getParentBeacon();
 				
 				//for first 10 blocks
 				if(newParent == null)

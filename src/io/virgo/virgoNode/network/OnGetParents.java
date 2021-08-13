@@ -22,7 +22,7 @@ public class OnGetParents {
 			if(parents.length() > 0) {
 				
 				JSONObject response = new JSONObject();	
-				response.put("command", "childs");
+				response.put("command", "parents");
 				response.put("txHash", txHash.toString());
 				response.put("maxAncestorHash", maxAncestorHash.toString());
 				response.put("parents", parents);

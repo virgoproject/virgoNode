@@ -138,7 +138,7 @@ public class TxServlet {
 	public static Response POST(String[] arguments, String requestBody) {
 		try {
 			JSONObject txJSON = new JSONObject(requestBody);
-			Main.getDAG().verificationPool. new jsonVerificationTask(txJSON, false);
+			Main.getDAG().verificationPool. new jsonVerificationTask(txJSON, false, true);
 			return new Response(200, "");
 		}catch(JSONException|IllegalArgumentException e) {
 			return new Response(405, "");

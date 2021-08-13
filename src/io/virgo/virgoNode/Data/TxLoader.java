@@ -10,6 +10,7 @@ import org.json.JSONObject;
 import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.DAG.DAG;
+import io.virgo.virgoNode.DAG.LoadedTransaction;
 import io.virgo.virgoNode.network.Peers;
 
 /**
@@ -36,11 +37,17 @@ public class TxLoader implements Runnable{
 					JSONObject txJSON = Main.getDatabase().getTx(txUid);
 					
 					if(txJSON != null)
-						dag.verificationPool. new jsonVerificationTask(txJSON, true);
+						dag.verificationPool. new jsonVerificationTask(txJSON, true, false);
 					else throw new JSONException("");
 					
 				} catch (JSONException | SQLException | IllegalArgumentException e) {
-					Peers.askParents(txUid, Main.getDAG().getTips()[0].getHash());
+					
+					LoadedTransaction selectedTip = null;
+					for(LoadedTransaction tip : Main.getDAG().getTips())
+						if(selectedTip == null || selectedTip.getDate() < tip.getDate())
+							selectedTip = tip;
+					
+					Peers.askParents(txUid, selectedTip.getHash());
 				}				
 				
 			} catch (InterruptedException e) {

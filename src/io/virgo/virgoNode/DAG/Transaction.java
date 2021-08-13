@@ -1,5 +1,6 @@
 package io.virgo.virgoNode.DAG;
 
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -298,7 +299,28 @@ public class Transaction {
 	}
 
 	public LoadedTransaction getLoaded() {
+		if(loadedTx == null) {
+			try {
+				JSONObject state = Main.getDatabase().getState(getHash());
+				return new LoadedTransaction(state, this);
+			} catch (SQLException e) {
+				//FATAL ERROR
+				e.printStackTrace();
+			}
+		}
+		
+		loadedTx.lastAccessed = System.currentTimeMillis();
 		return loadedTx;
+	}
+	
+	public void unload() {
+		try {
+			Main.getDatabase().insertState(loadedTx);
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
+		loadedTx = null;
+		Main.getDAG().loadedTransactions.remove(loadedTx);
 	}
 	
 }

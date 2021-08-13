@@ -2,6 +2,7 @@ package io.virgo.virgoNode.network;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -46,7 +47,6 @@ public class Peers {
 	}
 
 	public static void askParents(Sha256Hash txHash, Sha256Hash maxAncestorHash) {
-		
 		JSONObject message = new JSONObject();
 		message.put("command", "getParents");
 		message.put("txHash", txHash.toString());
@@ -54,6 +54,20 @@ public class Peers {
 
 		GeoWeb.getInstance().broadCast(message);
 		
+	}
+	
+	public static void invite(List<Sha256Hash> txHashes) {
+		
+		JSONArray hashes = new JSONArray();
+		
+		for(Sha256Hash txHash : txHashes)
+			hashes.put(txHash.toString());
+		
+		JSONObject message = new JSONObject();
+		message.put("command", "inv");
+		message.put("ids", hashes);
+
+		GeoWeb.getInstance().broadCast(message);
 	}
 	
 }

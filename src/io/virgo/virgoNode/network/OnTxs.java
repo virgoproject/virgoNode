@@ -10,12 +10,19 @@ public class OnTxs {
 
 	public static void handle(JSONObject messageJson, Peer peer) {
 		JSONArray txs = messageJson.getJSONArray("txs");
-				
+		
+		System.out.println("received " + txs.length() + " txs");
+		
 		for(int i = 0; i < txs.length(); i++) {
 			
 			JSONObject txJson = txs.getJSONObject(i);
 			
-			Main.getDAG().verificationPool. new jsonVerificationTask(txJson, false);
+			boolean relay = false;
+			
+			if(txJson.has("relay"))
+				relay = true;
+			
+			Main.getDAG().verificationPool. new jsonVerificationTask(txJson, false, relay);
 			
 		}
 		

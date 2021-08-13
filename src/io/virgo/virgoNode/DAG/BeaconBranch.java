@@ -32,7 +32,7 @@ public class BeaconBranch {
 	 */
 	public BigInteger addTx(LoadedTransaction tx) {
 		
-		transactions.add(tx);
+		transactions.add(tx.baseTransaction);
 		
 		BigInteger displacement = branchWeight;
 		

@@ -16,6 +16,7 @@ import io.virgo.virgoCryptoLib.Converter;
 import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.DAG.DAG;
+import io.virgo.virgoNode.DAG.LoadedTransaction;
 import io.virgo.virgoNode.DAG.Transaction;
 import io.virgo.virgoNode.DAG.TxOutput;
 
@@ -43,6 +44,9 @@ public class Database {
 		
 		Statement txsCreateStmt = conn.createStatement();
 		txsCreateStmt.execute("CREATE TABLE IF NOT EXISTS txs (id text PRIMARY key, sig data, pubKey data, parents text, inputs text, outputs text, parentBeacon data, nonce data, date integer);");
+		
+		Statement statesCreateStmt = conn.createStatement();
+		statesCreateStmt.execute("CREATE TABLE IF NOT EXISTS states (id text PRIMARY key, state text);");
 		
 	}
 	
@@ -139,7 +143,7 @@ public class Database {
 		}
 		
 		if(date != -1l) {
-			PreparedStatement stmt2 = conn.prepareStatement("SELECT id FROM txs WHERE date>? ORDER BY date ASC LIMIT 500");
+			PreparedStatement stmt2 = conn.prepareStatement("SELECT id FROM txs WHERE date>=? ORDER BY date ASC LIMIT 2000");
 			stmt2.setLong(1, date);
 			
 			ResultSet result = stmt2.executeQuery();
@@ -156,7 +160,7 @@ public class Database {
 		
 		ArrayList<Sha256Hash> txsHashes = new ArrayList<Sha256Hash>();
 
-		if(!txHash.equals(Main.getDAG().getGenesis().getHash()) && !maxAncestorHash.equals(Main.getDAG().getGenesis().getHash())) {
+		if(!txHash.equals(Main.getDAG().getGenesis().getHash())) {
 		
 			long max = 0l;
 			long min = 0l;
@@ -170,19 +174,20 @@ public class Database {
 				max = res.getLong("date");
 			else return txsHashes;
 			
+			if(!maxAncestorHash.equals(Main.getDAG().getGenesis().getHash())) {
+				stmt = conn.prepareStatement("SELECT date FROM txs WHERE id=?");
+				stmt.setString(1, maxAncestorHash.toString());
+				
+				res = stmt.executeQuery();
+				
+				if(res.next())
+					min = res.getLong("date");
+				
+				if(min > max)
+					min = 0l;
+			}
 			
-			stmt = conn.prepareStatement("SELECT date FROM txs WHERE id=?");
-			stmt.setString(1, maxAncestorHash.toString());
-			
-			res = stmt.executeQuery();
-			
-			if(res.next())
-				min = res.getLong("date");
-			
-			if(min > max)
-				min = 0l;
-			
-			stmt = conn.prepareStatement("SELECT id FROM txs WHERE date<? AND date>? ORDER BY date ASC LIMIT 500");
+			stmt = conn.prepareStatement("SELECT id FROM txs WHERE date<=? AND date>=? ORDER BY date DESC LIMIT 2000");
 			stmt.setLong(1, max);
 			stmt.setLong(2, min);
 			
@@ -228,11 +233,34 @@ public class Database {
 	    		txJson.put("outputs", new JSONArray(result.getString("outputs")));
 	    		txJson.put("date", result.getLong("date"));
 	        	
-				dag.verificationPool. new jsonVerificationTask(txJson, true);
+				dag.verificationPool. new jsonVerificationTask(txJson, true, false);
 				
 			}
 			
 		}
+	}
+
+	public void insertState(LoadedTransaction tx) throws SQLException {
+		PreparedStatement insertStmt = conn.prepareStatement("REPLACE INTO states (id, state) VALUES (?,?)");
+    	
+    	insertStmt.setString(1, tx.getHash().toString());
+    	insertStmt.setString(2, tx.JSONState().toString());
+    	
+    	insertStmt.executeUpdate();
+	}
+	
+	public JSONObject getState(Sha256Hash hash) throws SQLException {
+		
+        String sql = "SELECT * FROM states WHERE id='"+hash.toString()+"'";
+        
+        Statement stmt = conn.createStatement();
+        ResultSet result = stmt.executeQuery(sql);
+		
+        if(result.next())
+        	return new JSONObject(result.getString("state"));
+        
+		return null;
+		
 	}
 	
 }

@@ -78,7 +78,7 @@ public class Main {
 					.netID(netId)
 					.peerCountTarget(peerCountTarget)
 					.messageHandler(new NetMessageHandler())
-					.maxMessageThreadPoolSize(1)
+					.maxMessageThreadPoolSize(10)
 					.build();
 			
 		} catch (IllegalArgumentException | IOException e) {
