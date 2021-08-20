@@ -40,13 +40,11 @@ public class OnParents {
 				message.put("command", "askTxs");
 				message.put("ids", new JSONArray(lakingTxs));
 				
-				SyncMessageResponse resp = peer.sendSyncMessage(message);
-				
-				if(resp.getResponseCode().equals(ResponseCode.OK))
-					((NetMessageHandler) GeoWeb.getInstance().getMessageHandler()).onMessage(resp.getResponse(), peer);
+				peer.sendMessage(message);
 				
 				if(!reachedEnd)
-					Peers.askParents(new Sha256Hash(parents.getString(parents.length()-1)), maxAncestorHash);
+					Peers.askParents(new Sha256Hash(parents.getString(parents.length()-1)), maxAncestorHash, 500);
+				
 			}
 								
 		}catch(Exception e) {}

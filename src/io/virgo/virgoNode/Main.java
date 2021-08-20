@@ -78,7 +78,7 @@ public class Main {
 					.netID(netId)
 					.peerCountTarget(peerCountTarget)
 					.messageHandler(new NetMessageHandler())
-					.maxMessageThreadPoolSize(10)
+					.maxMessageThreadPoolSize(100)
 					.build();
 			
 		} catch (IllegalArgumentException | IOException e) {
@@ -117,7 +117,7 @@ public class Main {
 				
 				NumberFormat formatter = new DecimalFormat("#0.00");
 				
-				System.out.print("\r " + txsSec + " txs/s | " + dag.loadedTxsCount() + " in total | " + dag.getPoolSize() + " txs waiting | " + net.getPeers().size() + " peers | " +
+				System.out.print("\r " + txsSec + " txs/s | " + (dag.loadedTransactions.size()+1) + "/" + dag.loadedTxsCount() + " in total | " + dag.getPoolSize() + " txs waiting | " + net.getPeers().size() + " peers | " +
 					formatter.format(usedMB) + "/" + formatter.format(maxMB) + "MB " + runningIndicators[currentIndicator]);
 				txsSec = 0;
 				currentIndicator++;

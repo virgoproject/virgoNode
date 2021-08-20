@@ -12,9 +12,10 @@ public class OnGetChilds {
 	public static void handle(JSONObject messageJson, Peer peer) {
 		try {
 			Sha256Hash txHash = new Sha256Hash(messageJson.getString("txHash"));
-			
+			int wanted = messageJson.getInt("wanted");
+
 			JSONArray childs = new JSONArray();
-			for(Sha256Hash hash : Main.getDatabase().getInsertedAfter(txHash))
+			for(Sha256Hash hash : Main.getDatabase().getInsertedAfter(txHash, wanted))
 				childs.put(hash.toString());
 						
 			//superior to 1 because getInsertedAfter will always return atleast txHash

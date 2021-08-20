@@ -36,21 +36,23 @@ public class Peers {
 		
 	}
 	
-	public static void askChilds(Sha256Hash txHash) {
+	public static void askChilds(Sha256Hash txHash, int wanted) {
 		
 		JSONObject message = new JSONObject();
 		message.put("command", "getChilds");
 		message.put("txHash", txHash.toString());
+		message.put("wanted", wanted);
 		
 		GeoWeb.getInstance().broadCast(message);
 				
 	}
 
-	public static void askParents(Sha256Hash txHash, Sha256Hash maxAncestorHash) {
+	public static void askParents(Sha256Hash txHash, Sha256Hash maxAncestorHash, int wanted) {
 		JSONObject message = new JSONObject();
 		message.put("command", "getParents");
 		message.put("txHash", txHash.toString());
 		message.put("maxAncestorHash", maxAncestorHash.toString());
+		message.put("wanted", wanted);
 
 		GeoWeb.getInstance().broadCast(message);
 		

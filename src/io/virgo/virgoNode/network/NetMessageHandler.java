@@ -61,7 +61,9 @@ public class NetMessageHandler extends MessageHandler {
 					OnGetNodeInfos.handle(messageJson, peer);
 			}
 			
-		}catch(JSONException|IllegalArgumentException e) {}
+		}catch(Exception e) {
+			e.printStackTrace();
+		}
 	}
 	
 }

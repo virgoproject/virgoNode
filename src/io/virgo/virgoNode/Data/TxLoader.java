@@ -47,7 +47,7 @@ public class TxLoader implements Runnable{
 						if(selectedTip == null || selectedTip.getDate() < tip.getDate())
 							selectedTip = tip;
 					
-					Peers.askParents(txUid, selectedTip.getHash());
+					Peers.askParents(txUid, selectedTip.getHash(), 10);
 				}				
 				
 			} catch (InterruptedException e) {

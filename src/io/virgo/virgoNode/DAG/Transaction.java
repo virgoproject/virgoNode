@@ -4,16 +4,16 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import io.virgo.virgoCryptoLib.Converter;
 import io.virgo.virgoCryptoLib.ECDSASignature;
-import io.virgo.virgoCryptoLib.Sha256;
 import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
-import io.virgo.virgoNode.Utils.Miscellaneous;
 
 /**
  * Base transaction object
@@ -44,6 +44,7 @@ public class Transaction {
 	private boolean isSaved;
 	
 	LoadedTransaction loadedTx = null;
+	ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 	
 	/**
 	 * Basic transaction constructor
@@ -65,6 +66,7 @@ public class Transaction {
 		
 		//calculate outputs sum
 		for(TxOutput out : outputs) {
+			out.setOriginTx(this);
 			this.outputs.put(out.getAddress(), out);
 			outputsValue += out.getAmount();
 		}
@@ -93,6 +95,7 @@ public class Transaction {
 		
 		//calculate outputs sum
 		for(TxOutput out : outputs) {
+			out.setOriginTx(this);
 			this.outputs.put(out.getAddress(), out);
 			outputsValue += out.getAmount();
 		}
@@ -109,6 +112,7 @@ public class Transaction {
 		this.outputs = new LinkedHashMap<String, TxOutput>();
 		
 		for(TxOutput out : outputs) {
+			out.setOriginTx(this);
 			this.outputs.put(out.getAddress(), out);
 			outputsValue += out.getAmount();
 		}
@@ -137,6 +141,10 @@ public class Transaction {
 		this.parentBeaconHash = baseTransaction.getParentBeaconHash();
 		this.nonce = baseTransaction.getNonce();
 		this.loadedTx = baseTransaction.loadedTx;
+		
+		for(TxOutput out : outputs.values())
+			out.setOriginTx(this);
+		
 	}
 
 
@@ -244,7 +252,7 @@ public class Transaction {
 		return txJson;
 	}
 	
-	public static Transaction fromState(JSONObject json) {
+	/*public static Transaction fromState(JSONObject json) {
 		
 		JSONArray parentsJSON = json.getJSONArray("parents");
 		
@@ -296,31 +304,47 @@ public class Transaction {
 			
 		}
 		
-	}
-
+	}*/
+	
 	public LoadedTransaction getLoaded() {
-		if(loadedTx == null) {
-			try {
-				JSONObject state = Main.getDatabase().getState(getHash());
-				return new LoadedTransaction(state, this);
-			} catch (SQLException e) {
-				//FATAL ERROR
-				e.printStackTrace();
-			}
+		lock.readLock().lock();
+		
+		LoadedTransaction tx = null;
+		try {
+			if(loadedTx == null)
+				new LoadedTransaction(Main.getDatabase().getState(getHash()), this);
+			
+			loadedTx.lastAccessed = System.currentTimeMillis();
+			
+		} catch (SQLException e) {
+		}finally {
+			tx = loadedTx;
+			lock.readLock().unlock();
 		}
 		
-		loadedTx.lastAccessed = System.currentTimeMillis();
+		return tx;
+	}
+	
+	public LoadedTransaction getLoadedWrite() {
+		lock.writeLock().lock();
+				
+		try {
+			if(loadedTx == null)
+				new LoadedTransaction(Main.getDatabase().getState(getHash()), this);
+			
+			loadedTx.lastAccessed = System.currentTimeMillis();
+			
+		} catch (SQLException e) {
+			//fatal
+			lock.writeLock().unlock();
+		}
+		
 		return loadedTx;
 	}
 	
-	public void unload() {
-		try {
-			Main.getDatabase().insertState(loadedTx);
-		} catch (SQLException e) {
-			e.printStackTrace();
-		}
-		loadedTx = null;
-		Main.getDAG().loadedTransactions.remove(loadedTx);
+	public void releaseWriteLock() {
+		if(lock.isWriteLockedByCurrentThread())
+			lock.writeLock().unlock();
 	}
 	
 }

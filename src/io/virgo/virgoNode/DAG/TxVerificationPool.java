@@ -144,7 +144,7 @@ public class TxVerificationPool {
 		
 		for(int i = 0; i < outputs.length(); i++) {
 			try {
-				TxOutput output = TxOutput.fromString(outputs.getString(i), null);				
+				TxOutput output = TxOutput.fromString(outputs.getString(i));				
 				cleanedOutputs.add(output);
 			}catch(JSONException | ArithmeticException | IllegalArgumentException e) {}
 		}
@@ -188,14 +188,12 @@ public class TxVerificationPool {
 							parentBeacon.toBytes(), Miscellaneous.longToBytes(date), nonce));
 					
 					//Ensure transaction isn't processed yet
-					if(dag.isLoaded(txHash) || dag.isTxWaiting(txHash)) {
-						System.out.println(txHash.toString() + "Already laoded");
+					if(dag.isLoaded(txHash) || dag.isTxWaiting(txHash))
 						return;
-					}
-
+					
 					if(relay)
 						Peers.invite(Arrays.asList(txHash));
-										
+					
 					initBeaconTx(txHash, parents, outputs, parentBeacon, nonce, date, saved);
 					
 				//regular transaction
@@ -208,10 +206,8 @@ public class TxVerificationPool {
 							(parents.toString() + inputs.toString() + outputs.toString()).getBytes(), pubKey, Miscellaneous.longToBytes(date)));
 					
 					//Ensure transaction isn't processed yet
-					if(dag.isLoaded(txHash) || dag.isTxWaiting(txHash)) {
-						System.out.println(txHash.toString() + "Already laoded");
-						return;
-					}
+					if(dag.isLoaded(txHash) || dag.isTxWaiting(txHash))
+						return;					
 					
 					if(relay)
 						Peers.invite(Arrays.asList(txHash));
@@ -283,7 +279,7 @@ public class TxVerificationPool {
 				long amount = input.getOutputsMap().get(tx.getAddress()).getAmount();
 				totalInputValue += amount;
 			}
-
+			
 			//Check if inputs contains enough funds to cover outputs
 			if(totalInputValue != tx.getOutputsValue())
 				return;
@@ -322,7 +318,7 @@ public class TxVerificationPool {
 						if(parent.isChildOf(otherParent))
 							return;
 					}
-
+			
 			//check if transaction timestamp is superior to last 10 blocks median and inferior to current time + 15 minutes
 			ArrayList<Long> timestamps = new ArrayList<Long>();
 			LoadedTransaction currentParent = parentBeacon;
@@ -356,7 +352,7 @@ public class TxVerificationPool {
 					
 			if(!childOf)
 				return;
-
+			
 			if(!tx.isSaved()) {
 				
 				synchronized(randomX) {
@@ -380,7 +376,7 @@ public class TxVerificationPool {
 						return;
 				}
 			}
-						
+			
 			dag.queue.add(dag.new txTask(tx, loadedParents, parentBeacon));
 		}
 		

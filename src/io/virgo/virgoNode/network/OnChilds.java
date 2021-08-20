@@ -5,10 +5,7 @@ import java.util.ArrayList;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import io.virgo.geoWeb.GeoWeb;
 import io.virgo.geoWeb.Peer;
-import io.virgo.geoWeb.ResponseCode;
-import io.virgo.geoWeb.SyncMessageResponse;
 import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 
@@ -37,10 +34,7 @@ public class OnChilds {
 				message.put("command", "askTxs");
 				message.put("ids", new JSONArray(lakingTxs));
 				
-				SyncMessageResponse resp = peer.sendSyncMessage(message);
-				
-				if(resp.getResponseCode().equals(ResponseCode.OK))
-					((NetMessageHandler) GeoWeb.getInstance().getMessageHandler()).onMessage(resp.getResponse(), peer);
+				peer.sendMessage(message);
 				
 				JSONArray tips = messageJson.getJSONArray("tips");
 				
@@ -48,13 +42,15 @@ public class OnChilds {
 					Sha256Hash tip = new Sha256Hash(tips.getString(i));
 					
 					if(!Main.getDAG().isLoaded(tip) && !childs.contains(tip.toString())) {
-						Peers.askChilds(new Sha256Hash(childs.get(childs.size()-1)));
+						Peers.askChilds(new Sha256Hash(childs.get(childs.size()-1)), 2000);
 						break;
 					}
 				}
 			}
 			
-		}catch(Exception e) {}
+		}catch(Exception e) {
+			e.printStackTrace();
+		}
 		
 	}
 	

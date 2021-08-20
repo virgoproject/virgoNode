@@ -14,9 +14,10 @@ public class OnGetParents {
 		try {
 			Sha256Hash txHash = new Sha256Hash(messageJson.getString("txHash"));
 			Sha256Hash maxAncestorHash = new Sha256Hash(messageJson.getString("maxAncestorHash"));
+			int wanted = messageJson.getInt("wanted");
 			
 			JSONArray parents = new JSONArray();
-			for(Sha256Hash hash : Main.getDatabase().getInsertedBefore(txHash, maxAncestorHash))
+			for(Sha256Hash hash : Main.getDatabase().getInsertedBefore(txHash, maxAncestorHash, wanted))
 				parents.put(hash.toString());
 			
 			if(parents.length() > 0) {

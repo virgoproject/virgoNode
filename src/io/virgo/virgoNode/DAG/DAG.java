@@ -32,7 +32,7 @@ import io.virgo.virgoNode.network.Peers;
 public class DAG implements Runnable {
 
 	private LinkedHashMap<Sha256Hash, Transaction> transactions = new LinkedHashMap<Sha256Hash, Transaction>();
-	CopyOnWriteArrayList<LoadedTransaction> loadedTransactions = new CopyOnWriteArrayList<LoadedTransaction>();
+	public CopyOnWriteArrayList<LoadedTransaction> loadedTransactions = new CopyOnWriteArrayList<LoadedTransaction>();
 	private ConcurrentHashMap<Sha256Hash, List<OrphanTransaction>> waitedTxs = new ConcurrentHashMap<Sha256Hash, List<OrphanTransaction>>();
 	//CopyOnWriteArrayList permits to safely write on theses list with the DAG thread while other threads are reading
 	protected ArrayList<Sha256Hash> waitingTxsHashes = new ArrayList<Sha256Hash>();
@@ -92,14 +92,12 @@ public class DAG implements Runnable {
 	//DAG thread receives raw verified transactions and try to load them
 	public void run() {
 		
-
-		
 		//start event listener thread
 		eventListener = new EventListener(this);
 		(new Thread(eventListener)).start();
 		
 		//Add genesis transaction to DAG
-		TxOutput out = new TxOutput("V2N5tYdd1Cm1xqxQDsY15x9ED8kyAUvjbWv", (long) (100000 * Math.pow(10, Main.DECIMALS)), new Sha256Hash("025a6f04e7047b713aaba7fc5003c8266302918c25d1526507becad795b01f3a"));
+		TxOutput out = new TxOutput("V2N5tYdd1Cm1xqxQDsY15x9ED8kyAUvjbWv", (long) (100000 * Math.pow(10, Main.DECIMALS)));
 		TxOutput[] genesisOutputs = {out};
 		
 		genesis = new LoadedTransaction(genesisOutputs);
@@ -143,7 +141,7 @@ public class DAG implements Runnable {
 						if(i >= childLessTxs.size())
 							break;
 						
-						Peers.askChilds(childLessTxs.get(i).getHash());
+						Peers.askChilds(childLessTxs.get(i).getHash(), 10);
 						i++;
 						
 						Thread.sleep(10000);
@@ -152,12 +150,6 @@ public class DAG implements Runnable {
 					if(waitedTxs.size() != 0) {
 						ArrayList<Sha256Hash> lakingTransactions = new ArrayList<Sha256Hash>(waitedTxs.keySet());
 						lakingTransactions.removeAll(waitingTxsHashes);
-						
-						System.out.println("laking");
-						
-						for(Sha256Hash laking : lakingTransactions) {
-							System.out.println(laking.toString());
-						}
 						
 						Peers.askTxs(lakingTransactions);
 					}
@@ -210,6 +202,7 @@ public class DAG implements Runnable {
 	 * to check that it's randomX hash match the required difficulty
 	 */
 	private void checkBeaconTx(Transaction tx) {
+		
 		if(transactions.containsKey(tx.getHash()) || waitingTxsHashes.contains(tx.getHash()))
 			return;
 		
@@ -245,6 +238,7 @@ public class DAG implements Runnable {
 	 * Add the given beacon to the DAG, at this point it's fully verified and safe to do so
 	 */
 	private void loadBeaconTx(Transaction tx, ArrayList<LoadedTransaction> loadedParents, LoadedTransaction parentBeacon) {
+		
 		if(transactions.containsKey(tx.getHash()) || waitingTxsHashes.contains(tx.getHash()))
 			return;
 		
@@ -266,6 +260,7 @@ public class DAG implements Runnable {
 	 * if so send it to verification pool for differents checks
 	 */
 	private void checkTx(Transaction tx) {
+		
 		if(transactions.containsKey(tx.getHash()) || waitingTxsHashes.contains(tx.getHash()))
 			return;
 		
@@ -305,6 +300,7 @@ public class DAG implements Runnable {
 	 * Add the given transaction to the DAG, safe to do as it's fully verified at this point
 	 */
 	private void loadTx(Transaction tx, ArrayList<LoadedTransaction> loadedParents, ArrayList<LoadedTransaction> loadedInputs) {
+		
 		if(transactions.containsKey(tx.getHash()) || waitingTxsHashes.contains(tx.getHash()))
 			return;
 		

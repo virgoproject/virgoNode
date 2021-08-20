@@ -7,7 +7,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -43,19 +45,22 @@ public class Database {
 	private void createTables() throws SQLException {
 		
 		Statement txsCreateStmt = conn.createStatement();
-		txsCreateStmt.execute("CREATE TABLE IF NOT EXISTS txs (id text PRIMARY key, sig data, pubKey data, parents text, inputs text, outputs text, parentBeacon data, nonce data, date integer);");
+		txsCreateStmt.execute("CREATE TABLE IF NOT EXISTS txs (id text PRIMARY key, sig data, pubKey data, parents text, inputs text, outputs text, parentBeacon data, nonce data, date integer, height integer);");
+		
+		Statement dropStatesStmt = conn.createStatement();
+		dropStatesStmt.execute("DROP TABLE IF EXISTS states");
 		
 		Statement statesCreateStmt = conn.createStatement();
-		statesCreateStmt.execute("CREATE TABLE IF NOT EXISTS states (id text PRIMARY key, state text);");
+		statesCreateStmt.execute("CREATE TABLE states (id text PRIMARY key, state text);");
 		
 	}
 	
 	/**
 	 * Insert a transaction into database
 	 */
-	public void insertTx(Transaction tx) throws SQLException {
+	public void insertTx(LoadedTransaction tx) throws SQLException {
 		
-		PreparedStatement insertStmt = conn.prepareStatement("INSERT OR IGNORE INTO txs (id, sig, pubKey, parents, inputs, outputs, parentBeacon, nonce, date) VALUES (?,?,?,?,?,?,?,?,?)");
+		PreparedStatement insertStmt = conn.prepareStatement("INSERT OR IGNORE INTO txs (id, sig, pubKey, parents, inputs, outputs, parentBeacon, nonce, date, height) VALUES (?,?,?,?,?,?,?,?,?,?)");
     	
     	insertStmt.setString(1, tx.getHash().toString());
     	insertStmt.setString(4,  new JSONArray(tx.getParentsHashesStrings()).toString());
@@ -80,6 +85,7 @@ public class Database {
 		   outputsJson.put(entry.getValue().toString());
 		insertStmt.setString(6, outputsJson.toString());
 		insertStmt.setLong(9, tx.getDate());
+		insertStmt.setLong(10, tx.getHeight());
 		
     	insertStmt.executeUpdate();
 		
@@ -123,40 +129,41 @@ public class Database {
         return null;
 	}
 	
-	public ArrayList<Sha256Hash> getInsertedAfter(Sha256Hash txHash) throws SQLException {
+	public ArrayList<Sha256Hash> getInsertedAfter(Sha256Hash txHash, int wanted) throws SQLException {
 		
 		ArrayList<Sha256Hash> txsHashes = new ArrayList<Sha256Hash>();
 		
-		long date = -1l;
+		long height = -1l;
 		
 		if(!txHash.equals(Main.getDAG().getGenesis().getHash())) {
-			PreparedStatement stmt = conn.prepareStatement("SELECT date FROM txs WHERE id=?");
+			PreparedStatement stmt = conn.prepareStatement("SELECT height FROM txs WHERE id=?");
 			stmt.setString(1, txHash.toString());
 			
 			ResultSet res = stmt.executeQuery();
 			
 			if(res.next())
-				date = res.getLong("date");
+				height = res.getLong("height");
 			
 		}else {
-			date = 0l;
+			height = 0l;
 		}
 		
-		if(date != -1l) {
-			PreparedStatement stmt2 = conn.prepareStatement("SELECT id FROM txs WHERE date>=? ORDER BY date ASC LIMIT 2000");
-			stmt2.setLong(1, date);
+		if(height != -1l) {
+			PreparedStatement stmt2 = conn.prepareStatement("SELECT id FROM txs WHERE height>=? ORDER BY height ASC LIMIT ?");
+			stmt2.setLong(1, height);
+			stmt2.setInt(2, wanted);
 			
 			ResultSet result = stmt2.executeQuery();
 			
 			while(result.next())
 				txsHashes.add(new Sha256Hash(result.getString("id")));
 		}
-		
+				
 		return txsHashes; 
 		
 	}
 	
-	public ArrayList<Sha256Hash> getInsertedBefore(Sha256Hash txHash, Sha256Hash maxAncestorHash) throws SQLException {
+	public ArrayList<Sha256Hash> getInsertedBefore(Sha256Hash txHash, Sha256Hash maxAncestorHash, int wanted) throws SQLException {
 		
 		ArrayList<Sha256Hash> txsHashes = new ArrayList<Sha256Hash>();
 
@@ -165,37 +172,38 @@ public class Database {
 			long max = 0l;
 			long min = 0l;
 			
-			PreparedStatement stmt = conn.prepareStatement("SELECT date FROM txs WHERE id=?");
+			PreparedStatement stmt = conn.prepareStatement("SELECT height FROM txs WHERE id=?");
 			stmt.setString(1, txHash.toString());
 			
 			ResultSet res = stmt.executeQuery();
 			
 			if(res.next())
-				max = res.getLong("date");
+				max = res.getLong("height");
 			else return txsHashes;
 			
 			if(!maxAncestorHash.equals(Main.getDAG().getGenesis().getHash())) {
-				stmt = conn.prepareStatement("SELECT date FROM txs WHERE id=?");
+				stmt = conn.prepareStatement("SELECT height FROM txs WHERE id=?");
 				stmt.setString(1, maxAncestorHash.toString());
 				
 				res = stmt.executeQuery();
 				
 				if(res.next())
-					min = res.getLong("date");
+					min = res.getLong("height");
 				
 				if(min > max)
 					min = 0l;
 			}
 			
-			stmt = conn.prepareStatement("SELECT id FROM txs WHERE date<=? AND date>=? ORDER BY date DESC LIMIT 2000");
+			stmt = conn.prepareStatement("SELECT id FROM txs WHERE height<=? AND height>=? ORDER BY height DESC LIMIT ?");
 			stmt.setLong(1, max);
 			stmt.setLong(2, min);
-			
+			stmt.setInt(3, wanted);
+						
 			res = stmt.executeQuery();
 			
 			while(res.next())
 				txsHashes.add(new Sha256Hash(res.getString("id")));
-			
+						
 		}
 		
 		return txsHashes;
@@ -209,7 +217,7 @@ public class Database {
 		
 		Statement getTransactionsStmt = conn.createStatement();
 		
-		if(getTransactionsStmt.execute("SELECT * FROM txs ORDER BY date ASC")) {
+		if(getTransactionsStmt.execute("SELECT * FROM txs ORDER BY height ASC")) {
 			
 			ResultSet result = getTransactionsStmt.getResultSet();
 			
@@ -247,6 +255,28 @@ public class Database {
     	insertStmt.setString(2, tx.JSONState().toString());
     	
     	insertStmt.executeUpdate();
+	}
+
+	public boolean insertStates(ArrayList<LoadedTransaction> txsToPrune) throws SQLException {
+		
+		conn.setAutoCommit(false);
+		
+		for(LoadedTransaction tx : txsToPrune) {
+			try {
+				PreparedStatement insertStmt = conn.prepareStatement("REPLACE INTO states (id, state) VALUES (?,?)");
+		    	insertStmt.setString(1, tx.getHash().toString());
+		    	insertStmt.setString(2, tx.JSONState().toString());
+		    	
+		    	insertStmt.executeUpdate();
+			}catch(SQLException e) {
+				conn.rollback();
+				return false;
+			}
+
+		}
+		
+		conn.commit();
+		return true;
 	}
 	
 	public JSONObject getState(Sha256Hash hash) throws SQLException {
