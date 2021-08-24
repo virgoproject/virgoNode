@@ -4,20 +4,15 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
-import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 
-import org.json.JSONObject;
-
-import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 
 public class Pruner implements Runnable {
 
 	private int minElements = 10000;//minimal number of elements to keep in memory
-	private float startThresold = 0.1f;//memory usage percentile at which pruner will execute
-	private float targetUsage = 0.05f;
+	private float startThresold = 0.7f;//memory usage percentile at which pruner will execute
+	private float targetUsage = 0.4f;
 	private float currentUsage = 0f;
 	
 	private Comparator<LoadedTransaction> comparator = new Comparator<LoadedTransaction>() {
@@ -41,7 +36,7 @@ public class Pruner implements Runnable {
 				prune();
 			
 			try {
-				Thread.sleep(1000);
+				Thread.sleep(10000);
 			} catch (InterruptedException e) {}
 		}
 	}
@@ -84,7 +79,7 @@ public class Pruner implements Runnable {
 		System.gc();
 		
 		try {
-			Thread.sleep(10000);
+			Thread.sleep(60000);
 		} catch (InterruptedException e) {}
 		
 	}

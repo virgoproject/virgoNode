@@ -41,7 +41,6 @@ public class DAG implements Runnable {
 
 	protected HashMap<String, BeaconBranch> branches = new HashMap<String, BeaconBranch>();
 	protected HashMap<String, TxOutput> outputs = new HashMap<String, TxOutput>();
-
 	
 	PriorityBlockingQueue<txTask> queue;
 	

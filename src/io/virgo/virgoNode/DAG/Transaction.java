@@ -308,7 +308,6 @@ public class Transaction {
 	
 	public LoadedTransaction getLoaded() {
 		lock.readLock().lock();
-		
 		LoadedTransaction tx = null;
 		try {
 			if(loadedTx == null)
@@ -317,6 +316,7 @@ public class Transaction {
 			loadedTx.lastAccessed = System.currentTimeMillis();
 			
 		} catch (SQLException e) {
+			e.printStackTrace();
 		}finally {
 			tx = loadedTx;
 			lock.readLock().unlock();
@@ -325,9 +325,8 @@ public class Transaction {
 		return tx;
 	}
 	
-	public LoadedTransaction getLoadedWrite() {
+	public LoadedTransaction getLoadedWrite(int i) {
 		lock.writeLock().lock();
-				
 		try {
 			if(loadedTx == null)
 				new LoadedTransaction(Main.getDatabase().getState(getHash()), this);
@@ -343,7 +342,8 @@ public class Transaction {
 	}
 	
 	public void releaseWriteLock() {
-		if(lock.isWriteLockedByCurrentThread())
+		int c = lock.getWriteHoldCount();
+		for(int i = 0; i < c; i++)
 			lock.writeLock().unlock();
 	}
 	

@@ -82,7 +82,7 @@ public class TxServlet {
 						txState.put("status", tx.getStatus().ordinal());
 						txState.put("confirmations", tx.confirmationCount());
 						
-						LoadedTransaction settler = tx.getSettlingTransaction().getLoaded();
+						Transaction settler = tx.getSettlingTransaction();
 						
 						if(settler != null)
 							txState.put("beacon", settler.getHash().toString());
