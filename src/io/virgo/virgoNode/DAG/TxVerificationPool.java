@@ -267,10 +267,8 @@ public class TxVerificationPool {
 				if(!childOfInputs.contains(input))
 					return;
 				
-				
 				if(!input.getOutputsMap().containsKey(tx.getAddress()))
 					return;
-				
 				
 				if(input.getDate() > tx.getDate())
 					return;

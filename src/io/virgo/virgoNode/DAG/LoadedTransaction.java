@@ -107,9 +107,9 @@ public class LoadedTransaction {
 		practical_randomX_key = getHash();
 		
 		//Prefill difficulties and solveTimes with perfect values to smooth first blocks difficulty drop
-		for(int i = 0; i < 27; i++) {
+		for(int i = 0; i < 38; i++) {
 			difficulties.add(difficulty);
-			solveTimes.add(30);
+			solveTimes.add(10);
 		}
 		
 		settlingTransaction = baseTransaction;
@@ -151,11 +151,11 @@ public class LoadedTransaction {
 		difficulties = parentBeacon.getDifficulties();
 		solveTimes = parentBeacon.getSolveTimes();
 		
-		if(difficulties.size() == 27)
+		if(difficulties.size() == 38)
 			difficulties.remove(0);
 		difficulties.add(difficulty);
 		
-		if(solveTimes.size() == 27)
+		if(solveTimes.size() == 38)
 			solveTimes.remove(0);
 		solveTimes.add((int)(getDate()-parentBeacon.getDate())/1000);
 		
@@ -579,7 +579,7 @@ public class LoadedTransaction {
 	 */
 	private BigInteger calcDifficulty(List<BigInteger> targets, List<Integer> solveTimes) {
 		
-		int T = 30;
+		int T = 10;
 		
 		BigInteger sumD = BigInteger.valueOf(0);
 		double sumST = 0;
@@ -590,8 +590,8 @@ public class LoadedTransaction {
 		   if (solveTime < -6*T) {solveTime = -6*T; }
 		   sumST += solveTime;
 		}
-		//sumST = 0.75*T*60
-		sumST = 607.5 + 0.2523*sumST;
+		
+		sumST = 285 + 0.2523*sumST;
 		return sumD.multiply(BigInteger.valueOf(T)).divide(BigInteger.valueOf((long) sumST));
 		
 	}
