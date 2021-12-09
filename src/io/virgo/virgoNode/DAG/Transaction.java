@@ -325,7 +325,7 @@ public class Transaction {
 		return tx;
 	}
 	
-	public LoadedTransaction getLoadedWrite(int i) {
+	public LoadedTransaction getLoadedWrite() {
 		lock.writeLock().lock();
 		try {
 			if(loadedTx == null)
