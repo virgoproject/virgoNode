@@ -1,8 +1,11 @@
 package io.virgo.virgoNode.DAG;
 
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -40,6 +43,9 @@ public class Transaction {
 	
 	private boolean isSaved;
 	
+	LoadedTransaction loadedTx = null;
+	ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+	
 	/**
 	 * Basic transaction constructor
 	 */
@@ -60,6 +66,7 @@ public class Transaction {
 		
 		//calculate outputs sum
 		for(TxOutput out : outputs) {
+			out.setOriginTx(this);
 			this.outputs.put(out.getAddress(), out);
 			outputsValue += out.getAmount();
 		}
@@ -88,6 +95,7 @@ public class Transaction {
 		
 		//calculate outputs sum
 		for(TxOutput out : outputs) {
+			out.setOriginTx(this);
 			this.outputs.put(out.getAddress(), out);
 			outputsValue += out.getAmount();
 		}
@@ -104,6 +112,7 @@ public class Transaction {
 		this.outputs = new LinkedHashMap<String, TxOutput>();
 		
 		for(TxOutput out : outputs) {
+			out.setOriginTx(this);
 			this.outputs.put(out.getAddress(), out);
 			outputsValue += out.getAmount();
 		}
@@ -131,6 +140,11 @@ public class Transaction {
 		this.isGenesis = baseTransaction.isGenesis();
 		this.parentBeaconHash = baseTransaction.getParentBeaconHash();
 		this.nonce = baseTransaction.getNonce();
+		this.loadedTx = baseTransaction.loadedTx;
+		
+		for(TxOutput out : outputs.values())
+			out.setOriginTx(this);
+		
 	}
 
 
@@ -236,6 +250,101 @@ public class Transaction {
 		txJson.put("date", getDate());
 		
 		return txJson;
+	}
+	
+	/*public static Transaction fromState(JSONObject json) {
+		
+		JSONArray parentsJSON = json.getJSONArray("parents");
+		
+		Sha256Hash[] parents = new Sha256Hash[parentsJSON.length()];
+		for(int i = 0; i < parentsJSON.length(); i++)
+			parents[i] = new Sha256Hash(parentsJSON.getString(i));
+		
+		
+		
+		JSONArray outputsIDs = json.getJSONArray("outputsIds");
+		
+		TxOutput[] outputs = new TxOutput[outputsIDs.length()];
+		for(int i = 0; i < outputsIDs.length(); i++)
+			outputs[i] = Main.getDAG().outputs.get(outputsIDs.get(i));
+		
+		
+		long date = json.getLong("date");
+		
+		//is beacon transaction
+		if(json.has("parentBeacon")) {
+			
+			Sha256Hash parentBeacon = new Sha256Hash(json.getString("parentBeacon"));
+			byte[] nonce = Converter.hexToBytes(json.getString("nonce"));
+		
+			Sha256Hash txHash = Sha256.getDoubleHash(Converter.concatByteArrays((parentsJSON.toString() + json.getJSONArray("outputs").toString()).getBytes(),
+					parentBeacon.toBytes(), Miscellaneous.longToBytes(date), nonce));
+			
+			return new Transaction(txHash, parents, outputs, parentBeacon, nonce, date, true);
+			
+		}else {
+			
+			byte[] sigBytes = Converter.hexToBytes(json.getString("sig"));
+			byte[] pubKey = Converter.hexToBytes(json.getString("pubKey"));
+			
+			
+			JSONArray inputsJSON = json.getJSONArray("inputs");
+			
+			Sha256Hash[] inputs = new Sha256Hash[inputsJSON.length()];
+			for(int i = 0; i < inputsJSON.length(); i++)
+				inputs[i] = new Sha256Hash(inputsJSON.getString(i));
+			
+			
+			Sha256Hash txHash = Sha256.getDoubleHash(Converter.concatByteArrays(
+					(parentsJSON.toString() + inputsJSON.toString() + json.getJSONArray("outputs").toString()).getBytes(), pubKey, Miscellaneous.longToBytes(date)));
+			
+			ECDSASignature sig = ECDSASignature.fromByteArray(sigBytes);
+			
+			return new Transaction(txHash, pubKey, sig, parents, inputs, outputs, date, true);
+			
+		}
+		
+	}*/
+	
+	public LoadedTransaction getLoaded() {
+		lock.readLock().lock();
+		LoadedTransaction tx = null;
+		try {
+			if(loadedTx == null)
+				new LoadedTransaction(Main.getDatabase().getState(getHash()), this);
+			
+			loadedTx.lastAccessed = System.currentTimeMillis();
+			
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}finally {
+			tx = loadedTx;
+			lock.readLock().unlock();
+		}
+		
+		return tx;
+	}
+	
+	public LoadedTransaction getLoadedWrite(int i) {
+		lock.writeLock().lock();
+		try {
+			if(loadedTx == null)
+				new LoadedTransaction(Main.getDatabase().getState(getHash()), this);
+			
+			loadedTx.lastAccessed = System.currentTimeMillis();
+			
+		} catch (SQLException e) {
+			//fatal
+			lock.writeLock().unlock();
+		}
+		
+		return loadedTx;
+	}
+	
+	public void releaseWriteLock() {
+		int c = lock.getWriteHoldCount();
+		for(int i = 0; i < c; i++)
+			lock.writeLock().unlock();
 	}
 	
 }

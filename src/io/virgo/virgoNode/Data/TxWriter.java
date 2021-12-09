@@ -5,6 +5,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.DAG.DAG;
+import io.virgo.virgoNode.DAG.LoadedTransaction;
 import io.virgo.virgoNode.DAG.Transaction;
 
 /**
@@ -12,14 +13,14 @@ import io.virgo.virgoNode.DAG.Transaction;
  */
 public class TxWriter implements Runnable {
 
-	LinkedBlockingQueue<Transaction> queue = new LinkedBlockingQueue<Transaction>();
+	LinkedBlockingQueue<LoadedTransaction> queue = new LinkedBlockingQueue<LoadedTransaction>();
 	DAG dag;
 	
 	public TxWriter(DAG dag) {
 		this.dag = dag;	
 	}
 
-	public void push(Transaction tx) {		
+	public void push(LoadedTransaction tx) {		
 		if(!queue.contains(tx))
 			queue.add(tx);
 	}
@@ -30,7 +31,7 @@ public class TxWriter implements Runnable {
 		while(true) {
 			
 			try {
-				Transaction tx = queue.take();
+				LoadedTransaction tx = queue.take();
 				try {
 					Main.getDatabase().insertTx(tx);
 				} catch (SQLException e) {

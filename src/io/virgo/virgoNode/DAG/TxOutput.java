@@ -4,9 +4,9 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 import io.virgo.virgoCryptoLib.Converter;
-import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.Utils.Miscellaneous;
 
@@ -17,15 +17,20 @@ import io.virgo.virgoNode.Utils.Miscellaneous;
  */
 public class TxOutput {
 
-	private Sha256Hash originTx;
+	private String uuid;
+	
+	private Transaction originTx;
 	private String address;
 	private long amount;
-	public List<LoadedTransaction> claimers = Collections.synchronizedList(new ArrayList<LoadedTransaction>());
+	public List<Transaction> claimers = Collections.synchronizedList(new ArrayList<Transaction>());
 	
-	public TxOutput(String address, long amount, Sha256Hash originTx) {
+	public TxOutput(String address, long amount) {
+		uuid = UUID.randomUUID().toString();
+		
 		this.address = address;
 		this.amount = amount;
-		this.originTx = originTx;
+		
+		Main.getDAG().outputs.put(uuid, this);
 	}
 	
 	/**
@@ -37,16 +42,20 @@ public class TxOutput {
 	 * @throws ArithmeticException Given amount is out of range
 	 * @throws IllegalArgumentException Can't build a TxOutput from this string
 	 */
-	public static TxOutput fromString(String inputString, Sha256Hash originTx) throws ArithmeticException, IllegalArgumentException {
+	public static TxOutput fromString(String inputString) throws ArithmeticException, IllegalArgumentException {
 		
 		String[] outArgs = inputString.split(",");
 		
 		long value = Converter.hexToDec(outArgs[1]).longValueExact();
 		
 		if(Miscellaneous.validateAddress(outArgs[0], Main.ADDR_IDENTIFIER) && value > 0)
-			return new TxOutput(outArgs[0], value, originTx);
+			return new TxOutput(outArgs[0], value);
 		
 		throw new IllegalArgumentException("Can't build a TxOutput from this string.");
+	}
+	
+	public String getUUID() {
+		return uuid;
 	}
 	
 	public String toString() {
@@ -58,7 +67,11 @@ public class TxOutput {
 		
 	}
 	
-	public Sha256Hash getOriginTx() {
+	public void setOriginTx(Transaction transaction) {
+		originTx = transaction;
+	}
+	
+	public Transaction getOriginTx() {
 		return originTx;
 	}
 	
@@ -67,8 +80,8 @@ public class TxOutput {
 	}
 
 	public boolean isSpent() {
-		for(LoadedTransaction claimer : claimers) {
-			if(claimer.getStatus().isConfirmed())
+		for(Transaction claimer : claimers) {
+			if(claimer.getLoaded().getStatus().isConfirmed())
 				return true;
 		}
 		return false;

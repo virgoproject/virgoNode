@@ -3,9 +3,7 @@ package io.virgo.virgoNode.DAG;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.Arrays;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -20,6 +18,8 @@ import io.virgo.virgoCryptoLib.Sha256;
 import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.Utils.Miscellaneous;
+import io.virgo.virgoNode.Utils.PriorityQueueThreadPoolExecutor;
+import io.virgo.virgoNode.network.Peers;
 
 /**
  * Thread pool charged of verifying transactions before submitting them to the DAG handling thread
@@ -28,7 +28,7 @@ public class TxVerificationPool {
 
 	private DAG dag;
 	
-	private ThreadPoolExecutor pool;
+	private PriorityQueueThreadPoolExecutor pool;
 	
 	private Sha256Hash currentVmKey;
 	private RandomX randomX;
@@ -37,8 +37,7 @@ public class TxVerificationPool {
 	public TxVerificationPool(DAG dag) {
 		this.dag = dag;
 		
-		pool = (ThreadPoolExecutor) Executors.newFixedThreadPool(Math.max(1, Runtime.getRuntime().availableProcessors()-2));
-		pool.setKeepAliveTime(600000, TimeUnit.MILLISECONDS);
+		pool = new PriorityQueueThreadPoolExecutor(Math.max(1, Runtime.getRuntime().availableProcessors()-2));
 		
 		randomX = new RandomX.Builder().build();
 		
@@ -145,15 +144,14 @@ public class TxVerificationPool {
 		
 		for(int i = 0; i < outputs.length(); i++) {
 			try {
-				TxOutput output = TxOutput.fromString(outputs.getString(i), null);				
+				TxOutput output = TxOutput.fromString(outputs.getString(i));				
 				cleanedOutputs.add(output);
 			}catch(JSONException | ArithmeticException | IllegalArgumentException e) {}
 		}
 				
 		return new CleanedTx(cleanedParents, cleanedInputs, cleanedOutputs);
 	}
-	
-	
+
 	/**
 	 * Runnable building and verifying a transaction validity from JSON
 	 */
@@ -161,10 +159,12 @@ public class TxVerificationPool {
 
 		JSONObject txJson;
 		boolean saved;
+		boolean relay;
 		
-		public jsonVerificationTask(JSONObject txJson, boolean saved) {
+		public jsonVerificationTask(JSONObject txJson, boolean saved, boolean relay) {
 			this.txJson = txJson;
 			this.saved = saved;
+			this.relay = relay;
 			pool.submit(this);
 		}
 		
@@ -190,7 +190,10 @@ public class TxVerificationPool {
 					//Ensure transaction isn't processed yet
 					if(dag.isLoaded(txHash) || dag.isTxWaiting(txHash))
 						return;
-										
+					
+					if(relay)
+						Peers.invite(Arrays.asList(txHash));
+					
 					initBeaconTx(txHash, parents, outputs, parentBeacon, nonce, date, saved);
 					
 				//regular transaction
@@ -204,7 +207,10 @@ public class TxVerificationPool {
 					
 					//Ensure transaction isn't processed yet
 					if(dag.isLoaded(txHash) || dag.isTxWaiting(txHash))
-						return;
+						return;					
+					
+					if(relay)
+						Peers.invite(Arrays.asList(txHash));
 										
 					initTx(txHash, sigBytes, pubKey, parents, inputs, outputs, date, saved);
 				}				
@@ -230,11 +236,12 @@ public class TxVerificationPool {
 			this.loadedParents = loadedParents;
 			this.loadedInputs = loadedInputs;
 			
-			pool.submit(this);
+			pool.submit(this, 10);
 		}
 		
 		@Override
 		public void run() {
+			
 			//check if transaction has no useless parent
 			if(loadedParents.size() > 1)
 				for(LoadedTransaction parent : loadedParents)
@@ -260,10 +267,8 @@ public class TxVerificationPool {
 				if(!childOfInputs.contains(input))
 					return;
 				
-				
 				if(!input.getOutputsMap().containsKey(tx.getAddress()))
 					return;
-				
 				
 				if(input.getDate() > tx.getDate())
 					return;
@@ -272,7 +277,7 @@ public class TxVerificationPool {
 				long amount = input.getOutputsMap().get(tx.getAddress()).getAmount();
 				totalInputValue += amount;
 			}
-
+			
 			//Check if inputs contains enough funds to cover outputs
 			if(totalInputValue != tx.getOutputsValue())
 				return;
@@ -296,11 +301,12 @@ public class TxVerificationPool {
 			this.parentBeacon = parentBeacon;
 			this.loadedParents = loadedParents;
 			
-			pool.submit(this);
+			pool.submit(this, 10);
 		}
 		
 		@Override
 		public void run() {
+			
 			//check if transaction has no useless parent
 			if(loadedParents.size() > 1)
 				for(LoadedTransaction parent : loadedParents)
@@ -310,17 +316,20 @@ public class TxVerificationPool {
 						if(parent.isChildOf(otherParent))
 							return;
 					}
-
+			
 			//check if transaction timestamp is superior to last 10 blocks median and inferior to current time + 15 minutes
 			ArrayList<Long> timestamps = new ArrayList<Long>();
 			LoadedTransaction currentParent = parentBeacon;
 			for(int i = 0; i < 10; i++) {
 				timestamps.add(currentParent.getDate());
-				currentParent = currentParent.getParentBeacon();
+				Transaction newParent = currentParent.getParentBeacon();
 				
 				//for first 10 blocks
-				if(currentParent == null)
+				if(newParent == null)
 					break;
+				
+				currentParent = newParent.getLoaded();
+				
 			}
 			
 			timestamps.sort(null);
@@ -341,25 +350,31 @@ public class TxVerificationPool {
 					
 			if(!childOf)
 				return;
-
-			if(!parentBeacon.getRandomXKey().equals(currentVmKey)) {
-				randomX.changeKey(parentBeacon.getRandomXKey().toBytes());
-				currentVmKey = parentBeacon.getRandomXKey();
-			}
 			
-			byte[] txHash = randomX_vm.getHash(tx.getHash().toBytes());
+			if(!tx.isSaved()) {
+				
+				synchronized(randomX) {
+					if(!parentBeacon.getRandomXKey().equals(currentVmKey)) {
+						randomX.changeKey(parentBeacon.getRandomXKey().toBytes());
+						currentVmKey = parentBeacon.getRandomXKey();
+					}
 					
-			byte[] hashPadded = new byte[txHash.length + 1];
-			for (int i = 0; i < txHash.length; i++) {
-				hashPadded[i + 1] = txHash[i];
+					byte[] txHash = randomX_vm.getHash(tx.getHash().toBytes());
+				
+				
+					byte[] hashPadded = new byte[txHash.length + 1];
+					for (int i = 0; i < txHash.length; i++) {
+						hashPadded[i + 1] = txHash[i];
+					}
+					
+					BigInteger hashValue = new BigInteger(ByteBuffer.wrap(hashPadded).array());
+								
+					//check if required difficulty is met
+					if(hashValue.compareTo(Main.MAX_DIFFICULTY.divide(parentBeacon.getDifficulty())) >= 0)
+						return;
+				}
 			}
 			
-			BigInteger hashValue = new BigInteger(ByteBuffer.wrap(hashPadded).array());
-						
-			//check if required difficulty is met
-			if(hashValue.compareTo(Main.MAX_DIFFICULTY.divide(parentBeacon.getDifficulty())) >= 0)
-				return;
-						
 			dag.queue.add(dag.new txTask(tx, loadedParents, parentBeacon));
 		}
 		

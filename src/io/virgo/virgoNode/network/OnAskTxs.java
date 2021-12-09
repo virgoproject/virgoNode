@@ -15,21 +15,19 @@ public class OnAskTxs {
 		JSONArray foundTxs = new JSONArray();
 		
 		for(int i = 0; i < txs.length(); i++) {
-			Sha256Hash txHash = new Sha256Hash(txs.getString(i));
-			
-			if(Main.getDAG().hasTransaction(txHash))
-				foundTxs.put(txHash.toString());
-			
+			JSONObject txJSON = Main.getDAG().getTxJSON(new Sha256Hash(txs.getString(i)));
+			if(txJSON != null)
+				foundTxs.put(txJSON);
 		}
-		
+
 		if(foundTxs.length() == 0)
 			return;
+					
+		JSONObject resp = new JSONObject();	
+		resp.put("command", "txs");
+		resp.put("txs", foundTxs);
 		
-		JSONObject response = new JSONObject();	
-		response.put("command", "inv");
-		response.put("ids", foundTxs);
-		
-		peer.respondToMessage(response, messageJson);
+		peer.respondToMessage(resp, messageJson);
 		
 	}
 	

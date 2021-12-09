@@ -11,7 +11,7 @@ public class OnGetTxs {
 
 	public static void handle(JSONObject messageJson, Peer peer) {
 		JSONArray askedTxs = messageJson.getJSONArray("ids");
-		
+				
 		JSONArray foundTxs = new JSONArray();
 		
 		for(int i = 0; i < askedTxs.length(); i++) {
@@ -26,6 +26,7 @@ public class OnGetTxs {
 		JSONObject getTxsResp = new JSONObject();	
 		getTxsResp.put("command", "txs");
 		getTxsResp.put("txs", foundTxs);
+		getTxsResp.put("relay", true);
 		
 		peer.respondToMessage(getTxsResp, messageJson);
 		

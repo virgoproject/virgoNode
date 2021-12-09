@@ -1,7 +1,6 @@
 package io.virgo.virgoNode.Data;
 
 import java.sql.SQLException;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -11,6 +10,7 @@ import org.json.JSONObject;
 import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.DAG.DAG;
+import io.virgo.virgoNode.DAG.LoadedTransaction;
 import io.virgo.virgoNode.network.Peers;
 
 /**
@@ -37,11 +37,17 @@ public class TxLoader implements Runnable{
 					JSONObject txJSON = Main.getDatabase().getTx(txUid);
 					
 					if(txJSON != null)
-						dag.verificationPool. new jsonVerificationTask(txJSON, true);
+						dag.verificationPool. new jsonVerificationTask(txJSON, true, false);
 					else throw new JSONException("");
 					
 				} catch (JSONException | SQLException | IllegalArgumentException e) {
-					Peers.askTxs(Arrays.asList(txUid));
+					
+					LoadedTransaction selectedTip = null;
+					for(LoadedTransaction tip : Main.getDAG().getTips())
+						if(selectedTip == null || selectedTip.getDate() < tip.getDate())
+							selectedTip = tip;
+					
+					Peers.askParents(txUid, selectedTip.getHash(), 10);
 				}				
 				
 			} catch (InterruptedException e) {
