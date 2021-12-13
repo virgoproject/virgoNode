@@ -252,60 +252,6 @@ public class Transaction {
 		return txJson;
 	}
 	
-	/*public static Transaction fromState(JSONObject json) {
-		
-		JSONArray parentsJSON = json.getJSONArray("parents");
-		
-		Sha256Hash[] parents = new Sha256Hash[parentsJSON.length()];
-		for(int i = 0; i < parentsJSON.length(); i++)
-			parents[i] = new Sha256Hash(parentsJSON.getString(i));
-		
-		
-		
-		JSONArray outputsIDs = json.getJSONArray("outputsIds");
-		
-		TxOutput[] outputs = new TxOutput[outputsIDs.length()];
-		for(int i = 0; i < outputsIDs.length(); i++)
-			outputs[i] = Main.getDAG().outputs.get(outputsIDs.get(i));
-		
-		
-		long date = json.getLong("date");
-		
-		//is beacon transaction
-		if(json.has("parentBeacon")) {
-			
-			Sha256Hash parentBeacon = new Sha256Hash(json.getString("parentBeacon"));
-			byte[] nonce = Converter.hexToBytes(json.getString("nonce"));
-		
-			Sha256Hash txHash = Sha256.getDoubleHash(Converter.concatByteArrays((parentsJSON.toString() + json.getJSONArray("outputs").toString()).getBytes(),
-					parentBeacon.toBytes(), Miscellaneous.longToBytes(date), nonce));
-			
-			return new Transaction(txHash, parents, outputs, parentBeacon, nonce, date, true);
-			
-		}else {
-			
-			byte[] sigBytes = Converter.hexToBytes(json.getString("sig"));
-			byte[] pubKey = Converter.hexToBytes(json.getString("pubKey"));
-			
-			
-			JSONArray inputsJSON = json.getJSONArray("inputs");
-			
-			Sha256Hash[] inputs = new Sha256Hash[inputsJSON.length()];
-			for(int i = 0; i < inputsJSON.length(); i++)
-				inputs[i] = new Sha256Hash(inputsJSON.getString(i));
-			
-			
-			Sha256Hash txHash = Sha256.getDoubleHash(Converter.concatByteArrays(
-					(parentsJSON.toString() + inputsJSON.toString() + json.getJSONArray("outputs").toString()).getBytes(), pubKey, Miscellaneous.longToBytes(date)));
-			
-			ECDSASignature sig = ECDSASignature.fromByteArray(sigBytes);
-			
-			return new Transaction(txHash, pubKey, sig, parents, inputs, outputs, date, true);
-			
-		}
-		
-	}*/
-	
 	public LoadedTransaction getLoaded() {
 		lock.readLock().lock();
 		LoadedTransaction tx = null;
