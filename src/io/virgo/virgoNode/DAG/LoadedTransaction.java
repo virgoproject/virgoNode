@@ -58,8 +58,6 @@ public class LoadedTransaction {
 		this.baseTransaction = baseTransaction;
 		baseTransaction.loadedTx = this;
 		
-		
-		
 		Main.getDAG().pruner.queue.add(this);
 		
 		//calculate inputs value

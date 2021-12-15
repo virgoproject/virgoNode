@@ -90,7 +90,7 @@ public class TxVerificationPool {
 		ArrayList<TxOutput> constructedOutputs = cleanedTx.outputs;
 		
 		//make sure neither inputs or ouputs are empty
-		if(inputsHashes.isEmpty() || constructedOutputs.isEmpty() || parentsHashes.isEmpty())
+		if(inputsHashes.size() != inputs.length() || constructedOutputs.size() != outputs.length() || parentsHashes.size() != parents.length())
 			return;
 		
 		//check if signature is valid, bypass this check if transaction is coming from disk			
@@ -141,11 +141,15 @@ public class TxVerificationPool {
 		}
 		
 		ArrayList<TxOutput> cleanedOutputs = new ArrayList<TxOutput>();
-		
+		ArrayList<String> targets = new ArrayList<String>();
 		for(int i = 0; i < outputs.length(); i++) {
 			try {
-				TxOutput output = TxOutput.fromString(outputs.getString(i));				
-				cleanedOutputs.add(output);
+				TxOutput output = TxOutput.fromString(outputs.getString(i));
+				if(!targets.contains(output.getAddress())) {
+					cleanedOutputs.add(output);
+					targets.add(output.getAddress());
+				}
+				
 			}catch(JSONException | ArithmeticException | IllegalArgumentException e) {}
 		}
 				
