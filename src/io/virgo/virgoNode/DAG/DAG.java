@@ -3,6 +3,7 @@ package io.virgo.virgoNode.DAG;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -32,7 +33,6 @@ import io.virgo.virgoNode.network.Peers;
 public class DAG implements Runnable {
 
 	private LinkedHashMap<Sha256Hash, Transaction> transactions = new LinkedHashMap<Sha256Hash, Transaction>();
-	public CopyOnWriteArrayList<LoadedTransaction> loadedTransactions = new CopyOnWriteArrayList<LoadedTransaction>();
 	private ConcurrentHashMap<Sha256Hash, List<OrphanTransaction>> waitedTxs = new ConcurrentHashMap<Sha256Hash, List<OrphanTransaction>>();
 	//CopyOnWriteArrayList permits to safely write on theses list with the DAG thread while other threads are reading
 	protected ArrayList<Sha256Hash> waitingTxsHashes = new ArrayList<Sha256Hash>();
@@ -59,8 +59,10 @@ public class DAG implements Runnable {
 	
 	public boolean isFirst = true;
 	
+	public Pruner pruner = new Pruner();
+	
     private static final AtomicInteger taskCounter = new AtomicInteger(0);
-		
+    
 	public DAG(int saveInterval) {		
 		this.saveInterval = saveInterval;
 		
@@ -118,16 +120,25 @@ public class DAG implements Runnable {
 		verificationPool = new TxVerificationPool(this);
 		
 		//start transaction pruner
-		new Thread(new Pruner()).start();
+		new Thread(pruner).start();
 		
+		final DAG dag = this;
 		//load saved transactions
-		try {
-			Main.getDatabase().loadAllTransactions(this);
-		} catch (SQLException e1) {
-			System.out.println("Unable to load saved transactions: " + e1.getMessage());
-		}
+		new Thread(new Runnable() {
+
+			@Override
+			public void run() {
+				try {
+					Main.getDatabase().loadAllTransactions(dag);
+				} catch (SQLException e1) {
+					System.out.println("Unable to load saved transactions: " + e1.getMessage());
+				}
+			}
+			
+		}).start();
+
 		
-		//ask missing transactions and latest tips to peers every 10s
+		//ask missing transactions and latest tips to peers every 5s
 		new Timer().scheduleAtFixedRate(new TimerTask() {
 
 			@Override
@@ -140,17 +151,31 @@ public class DAG implements Runnable {
 						if(i >= childLessTxs.size())
 							break;
 						
-						Peers.askChilds(childLessTxs.get(i).getHash(), 10);
+						Peers.askChilds(childLessTxs.get(i).getHash(), 100);
 						i++;
 						
-						Thread.sleep(10000);
+						Thread.sleep(500);
 					}
 										
 					if(waitedTxs.size() != 0) {
 						ArrayList<Sha256Hash> lakingTransactions = new ArrayList<Sha256Hash>(waitedTxs.keySet());
 						lakingTransactions.removeAll(waitingTxsHashes);
 						
-						Peers.askTxs(lakingTransactions);
+						LoadedTransaction selectedTip = null;
+						for(LoadedTransaction tip : Main.getDAG().getTips())
+							if(selectedTip == null || selectedTip.getDate() < tip.getDate())
+								selectedTip = tip;
+						
+						while(true) {
+							if(i >= lakingTransactions.size() || i >= 20)//limit to 20 so we periodically refresh lakingTransactions list
+								break;
+							
+							Peers.askParents(lakingTransactions.get(i), selectedTip.getHash(), 10);
+							i++;
+							
+							Thread.sleep(250);
+						}
+						
 					}
 					
 				} catch (Exception e) {
@@ -158,20 +183,19 @@ public class DAG implements Runnable {
 				}
 			}
 			
-		}, 10000, 10000);
+		}, 5000, 5000);
 		
 		while(!Thread.interrupted()) {
 			
 			try {
-				txTask task = queue.take();
 				
+				txTask task = queue.take();
 				//load task
 				if(task.loadedParents != null)
 					if(task.tx.isBeaconTransaction())
 						loadBeaconTx(task.tx, task.loadedParents, task.parentBeacon);
 					else
 						loadTx(task.tx, task.loadedParents, task.loadedInputs);
-					
 				else//verif task
 					if(task.tx.isBeaconTransaction())
 						checkBeaconTx(task.tx);
@@ -312,8 +336,6 @@ public class DAG implements Runnable {
 						if(parent.isChildOf(loadedClaimer))
 							return;
 			}
-
-			
 		}
 		
 		//transmit tx to peers

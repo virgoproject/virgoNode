@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>virgoNode</groupId>
   <artifactId>virgoNode</artifactId>
-  <version>0.0.5-SNAPSHOT</version>
+  <version>0.1.0</version>
   <build>
     <sourceDirectory>src</sourceDirectory>
     <plugins>

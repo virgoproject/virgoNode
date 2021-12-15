@@ -38,10 +38,10 @@ public class DAGInfos {
 	
 	/**
 	 * Called when a new transaction is loaded
-	 * Currently just maintain a list of the 100 latest loaded transactions
+	 * Currently just maintain a list of the 100000 latest loaded transactions
 	 */
 	public void addTransaction(LoadedTransaction transaction) {
-		if(latestTransactions.size() >= 100)
+		if(latestTransactions.size() >= 100000)
 			latestTransactions.remove(0);
 		
 		latestTransactions.add(transaction.getHash());

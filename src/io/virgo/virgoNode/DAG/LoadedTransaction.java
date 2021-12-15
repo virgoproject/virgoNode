@@ -54,11 +54,13 @@ public class LoadedTransaction {
 	/**
 	 * Basic transaction constructor
 	 */
-	public LoadedTransaction(Transaction baseTransaction, LoadedTransaction[] parents, LoadedTransaction[] inputTxs) {
-		
+	public LoadedTransaction(Transaction baseTransaction, LoadedTransaction[] parents, LoadedTransaction[] inputTxs) {		
 		this.baseTransaction = baseTransaction;
 		baseTransaction.loadedTx = this;
-		Main.getDAG().loadedTransactions.add(this);
+		
+		
+		
+		Main.getDAG().pruner.queue.add(this);
 		
 		//calculate inputs value
 		for(LoadedTransaction inputTx : inputTxs) {
@@ -128,7 +130,7 @@ public class LoadedTransaction {
 	public LoadedTransaction(Transaction baseTransaction, LoadedTransaction[] parents, LoadedTransaction parentBeacon) {
 		this.baseTransaction = baseTransaction;
 		baseTransaction.loadedTx = this;
-		Main.getDAG().loadedTransactions.add(this);
+		Main.getDAG().pruner.queue.add(this);
 
 		
 		settlingTransaction = baseTransaction;
@@ -779,7 +781,7 @@ public class LoadedTransaction {
 			return;
 		
 		baseTransaction.loadedTx = this;
-		Main.getDAG().loadedTransactions.add(this);
+		Main.getDAG().pruner.queue.add(this);
 		
 		height = state.getInt("height");
 		status = TxStatus.fromCode(state.getInt("status"));

@@ -129,9 +129,27 @@ public class TxServlet {
 				
 			}
 			
+		case 3:
+			if(arguments[0].equals("latest")) {
+				
+				try {
+					int wanted = Integer.parseInt(arguments[1]);
+					
+					JSONArray resp = new JSONArray();
+					
+					for(Sha256Hash txHash : Main.getDAG().infos.getLatestTransactions(wanted))
+						resp.put(txHash.toString());
+					
+					return new Response(200, resp.toString());
+					
+				}catch(NumberFormatException e) {
+					return new Response(405, "");
+				}
+			}
+			
 		default: return new Response(405, "");
 		
-		}		
+		}
 		
 	}
 

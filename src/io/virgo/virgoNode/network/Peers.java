@@ -22,7 +22,6 @@ public class Peers {
 	}
 	
 	public static void askTxs(Collection<Sha256Hash> txHashes) {
-		
 		ArrayList<String> hashesStrings = new ArrayList<String>();
 		
 		for(Sha256Hash txHash : txHashes)
@@ -37,7 +36,6 @@ public class Peers {
 	}
 	
 	public static void askChilds(Sha256Hash txHash, int wanted) {
-		
 		JSONObject message = new JSONObject();
 		message.put("command", "getChilds");
 		message.put("txHash", txHash.toString());

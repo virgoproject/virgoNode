@@ -31,7 +31,7 @@ public class OnChilds {
 			
 			if(lakingTxs.size() > 0) {
 				JSONObject message = new JSONObject();
-				message.put("command", "askTxs");
+				message.put("command", "getTxs");
 				message.put("ids", new JSONArray(lakingTxs));
 				
 				peer.sendMessage(message);
@@ -42,7 +42,7 @@ public class OnChilds {
 					Sha256Hash tip = new Sha256Hash(tips.getString(i));
 					
 					if(!Main.getDAG().isLoaded(tip) && !childs.contains(tip.toString())) {
-						Peers.askChilds(new Sha256Hash(childs.get(childs.size()-1)), 2000);
+						Peers.askChilds(new Sha256Hash(childs.get(childs.size()-1)), 250);
 						break;
 					}
 				}

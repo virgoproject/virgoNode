@@ -37,7 +37,7 @@ public class OnParents {
 			
 			if(lakingTxs.size() > 0) {
 				JSONObject message = new JSONObject();
-				message.put("command", "askTxs");
+				message.put("command", "getTxs");
 				message.put("ids", new JSONArray(lakingTxs));
 				
 				peer.sendMessage(message);

@@ -13,11 +13,11 @@ public class OnGetChilds {
 		try {
 			Sha256Hash txHash = new Sha256Hash(messageJson.getString("txHash"));
 			int wanted = messageJson.getInt("wanted");
-
+			
 			JSONArray childs = new JSONArray();
 			for(Sha256Hash hash : Main.getDatabase().getInsertedAfter(txHash, wanted))
 				childs.put(hash.toString());
-						
+			
 			//superior to 1 because getInsertedAfter will always return atleast txHash
 			if(childs.length() > 1) {
 				JSONObject response = new JSONObject();	

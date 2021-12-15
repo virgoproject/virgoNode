@@ -4,6 +4,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import io.virgo.virgoNode.Main;
@@ -14,6 +15,11 @@ public class Pruner implements Runnable {
 	private float startThresold = 0.7f;//memory usage percentile at which pruner will execute
 	private float targetUsage = 0.4f;
 	private float currentUsage = 0f;
+	
+	public ArrayList<LoadedTransaction> loadedTransactions = new ArrayList<LoadedTransaction>();
+	public LinkedBlockingQueue<LoadedTransaction> queue = new LinkedBlockingQueue<LoadedTransaction>();
+	
+	public long nextCheck = System.currentTimeMillis();
 	
 	private Comparator<LoadedTransaction> comparator = new Comparator<LoadedTransaction>() {
 
@@ -31,13 +37,18 @@ public class Pruner implements Runnable {
 	public void run() {
 		while(!Thread.interrupted()) {
 			
-			currentUsage = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory())/(Runtime.getRuntime().maxMemory()*1.0f);
-			if(currentUsage > startThresold && Main.getDAG().loadedTransactions.size() > minElements)
-				prune();
-			
 			try {
-				Thread.sleep(10000);
+				loadedTransactions.add(queue.take());
 			} catch (InterruptedException e) {}
+			
+			if(System.currentTimeMillis() > nextCheck) {
+				currentUsage = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory())/(Runtime.getRuntime().maxMemory()*1.0f);
+				if(currentUsage > startThresold && loadedTransactions.size() > minElements)
+					prune();
+				else
+					nextCheck = System.currentTimeMillis() + 10000;
+			}
+
 		}
 	}
 
@@ -51,14 +62,15 @@ public class Pruner implements Runnable {
 	private void prune() {
 		System.out.println("pruner running");
 		
-		int toRemove = Math.min(Main.getDAG().loadedTransactions.size()-10000, (int) (Main.getDAG().loadedTransactions.size()*currentUsage-targetUsage));
-		
-		Collections.sort(Main.getDAG().loadedTransactions, comparator);
-		
 		ArrayList<LoadedTransaction> txsToPrune = new ArrayList<LoadedTransaction>();
+
+		
+		int toRemove = Math.min(loadedTransactions.size()-10000, (int) (loadedTransactions.size()*currentUsage-targetUsage));
+		
+		Collections.sort(loadedTransactions, comparator);
 		
 		for(int i = 0; i < toRemove; i++) {
-			LoadedTransaction tx = Main.getDAG().loadedTransactions.get(i);
+			LoadedTransaction tx = loadedTransactions.get(i);
 			try {
 				if(tx.baseTransaction.lock.writeLock().tryLock(1, TimeUnit.SECONDS))
 					txsToPrune.add(tx);
@@ -69,7 +81,7 @@ public class Pruner implements Runnable {
 			if(Main.getDatabase().insertStates(txsToPrune))
 				for(LoadedTransaction tx : txsToPrune) {
 					tx.baseTransaction.loadedTx = null;
-					Main.getDAG().loadedTransactions.remove(tx);
+					loadedTransactions.remove(tx);
 				}
 		} catch (SQLException e) {}
 		
@@ -78,9 +90,7 @@ public class Pruner implements Runnable {
 		
 		System.gc();
 		
-		try {
-			Thread.sleep(60000);
-		} catch (InterruptedException e) {}
+		nextCheck = System.currentTimeMillis() + 60000;
 		
 	}
 

@@ -68,7 +68,12 @@ public class Main {
 			System.out.println("Error loading database: " + e.getMessage());
 			System.out.println("Terminating.");
 		}
-
+		
+		System.out.println("Creating DAG");
+		
+		dag = new DAG(tipsSaveInterval);
+		new Thread(dag).start();
+		
 		//init GeoWeb (peer to peer networking) with a NetMessageHandler instance as messageHandler and loaded parameters 
 		//TODO: make Thread pool size configurable
 		try {
@@ -92,11 +97,6 @@ public class Main {
 		
 		System.out.println("P2P adapter loaded ! Listening on port " + netPort);
 		
-		System.out.println("Creating DAG");
-		
-		dag = new DAG(tipsSaveInterval);
-		new Thread(dag).start();
-		
 		System.out.println("Running REST server on port 8000");
 		try {
 			new Server();
@@ -117,7 +117,7 @@ public class Main {
 				
 				NumberFormat formatter = new DecimalFormat("#0.00");
 				
-				System.out.print("\r " + txsSec + " txs/s | " + (dag.loadedTransactions.size()+1) + "/" + dag.loadedTxsCount() + " in total | " + dag.getPoolSize() + " txs waiting | " + net.getPeers().size() + " peers | " +
+				System.out.print("\r " + txsSec + " txs/s | " + (dag.pruner.loadedTransactions.size()+1) + "/" + dag.loadedTxsCount() + " in total | " + dag.getPoolSize() + " txs waiting | " + net.getPeers().size() + " peers | " +
 					formatter.format(usedMB) + "/" + formatter.format(maxMB) + "MB " + runningIndicators[currentIndicator]);
 				txsSec = 0;
 				currentIndicator++;
