@@ -1,5 +1,6 @@
 package io.virgo.virgoNode.REST;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.json.JSONArray;
@@ -47,19 +48,20 @@ public class AddressServlet {
 					}
 					
 					List<Sha256Hash> transactions = infos.getTransactions();
-					int transactionsSize = transactions.size();//total address transaction count
+					
+					JSONObject response = new JSONObject();
+					response.put("size", transactions.size());
 					
 					JSONArray transactionsJSON = new JSONArray();
-
+					
 					if(transactions.size() != 0)
 						transactions = transactions.subList(Math.min((pages-1)*perPage, transactions.size()-1), Math.min(pages*perPage, transactions.size()));
 						
 					for(Sha256Hash txHash : transactions)
 						transactionsJSON.put(txHash.toString());
 					
-					JSONObject response = new JSONObject();
 					response.put("txs", transactionsJSON);
-					response.put("size", transactionsSize);
+					
 					
 					return new Response(200,response.toString());
 					
@@ -79,17 +81,20 @@ public class AddressServlet {
 					}
 					
 					List<Sha256Hash> inputs = infos.getInputs();
-					JSONArray inputsJSON = new JSONArray();
 
+					JSONObject response = new JSONObject();
+					response.put("size", inputs.size());
+					
+					JSONArray inputsJSON = new JSONArray();
+					
 					if(inputs.size() != 0)
 						inputs = inputs.subList(Math.min((pages-1)*perPage, inputs.size()-1), Math.min(pages*perPage, inputs.size()));
 					
 					for(Sha256Hash txHash : inputs)
 						inputsJSON.put(txHash.toString());
-						
-					JSONObject response = new JSONObject();
+					
 					response.put("inputs", inputsJSON);
-					response.put("size", inputs.size());
+					
 					
 					return new Response(200,response.toString());
 					
@@ -109,6 +114,10 @@ public class AddressServlet {
 					}
 					
 					List<Sha256Hash> outputs = infos.getOutputs();
+					
+					JSONObject response = new JSONObject();
+					response.put("size", outputs.size());
+					
 					JSONArray outputsJSON = new JSONArray();
 
 					if(outputs.size() != 0)
@@ -117,9 +126,51 @@ public class AddressServlet {
 					for(Sha256Hash txHash : outputs)
 						outputsJSON.put(txHash.toString());
 					
-					JSONObject response = new JSONObject();
 					response.put("outputs", outputsJSON);
-					response.put("size", outputs.size());
+					
+					return new Response(200,response.toString());
+					
+				}catch(NumberFormatException e) {
+					return new Response(405, "");
+				}
+				
+			case "unspent":
+				try {
+					
+					int perPage = 10;
+					int pages = 1;
+					if(arguments.length >= 3) {
+						perPage = Math.abs(Integer.parseInt(arguments[2]));
+						if(arguments.length >= 4)
+							pages = Math.abs(Integer.parseInt(arguments[3]));
+					}
+					
+					List<Sha256Hash> unspent = new ArrayList<Sha256Hash>();
+					
+					int skipped = 0; 
+					
+					for(Sha256Hash input : infos.getInputs()) {
+						if(skipped < (pages-1)*perPage){
+							skipped++;
+							continue;
+						}
+						
+						if(!Main.getDAG().getTx(input).getOutputsMap().get(arguments[0]).isSpent())
+							unspent.add(input);
+						
+						if(unspent.size() == perPage)
+							break;
+					}
+
+					JSONObject response = new JSONObject();
+					response.put("size", unspent.size());
+					
+					JSONArray inputsJSON = new JSONArray();
+					
+					for(Sha256Hash txHash : unspent)
+						inputsJSON.put(txHash.toString());
+					
+					response.put("unspent", inputsJSON);
 					
 					
 					return new Response(200,response.toString());

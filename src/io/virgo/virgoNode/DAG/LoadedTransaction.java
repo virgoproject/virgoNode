@@ -38,7 +38,7 @@ public class LoadedTransaction {
 	
 	//beacon related variables
 	private BigInteger floorWeight;
-	private long beaconHeight;
+	private long beaconHeight = 0;
 	public ArrayList<Transaction> loadedChildBeacons = new ArrayList<Transaction>();
 	private boolean mainChainMember = false;
 	private boolean confirmedParents = false;

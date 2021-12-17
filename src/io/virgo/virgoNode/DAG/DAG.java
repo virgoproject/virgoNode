@@ -410,7 +410,6 @@ public class DAG implements Runnable {
 	 */
 	public LoadedTransaction getBestTipBeacon() {
 		LoadedTransaction selectedBeacon = null;
-		
 		for(LoadedTransaction beacon : childLessBeacons) {
 			if(selectedBeacon == null) {
 				selectedBeacon = beacon;
@@ -422,24 +421,26 @@ public class DAG implements Runnable {
 				continue;
 			}
 			
-			if(selectedBeacon.getWeight().compareTo(beacon.getWeight()) < 0) {
-				selectedBeacon = beacon;
-				continue;
-			}
-			
-			if(selectedBeacon.getWeight() == beacon.getWeight()) {
-				if(selectedBeacon.getBeaconHeight() < beacon.getBeaconHeight()) {
+			if(selectedBeacon.getFloorWeight().compareTo(beacon.getFloorWeight()) == 0) {
+				if(selectedBeacon.getWeight().compareTo(beacon.getWeight()) < 0) {
 					selectedBeacon = beacon;
 					continue;
 				}
-				
-				if(selectedBeacon.getBeaconHeight() == beacon.getBeaconHeight()) {
-					if(selectedBeacon.getDate() > beacon.getDate()) {
+				if(selectedBeacon.getWeight() == beacon.getWeight()) {
+					if(selectedBeacon.getBeaconHeight() < beacon.getBeaconHeight()) {
 						selectedBeacon = beacon;
 						continue;
 					}
+					if(selectedBeacon.getBeaconHeight() == beacon.getBeaconHeight()) {
+						if(selectedBeacon.getDate() > beacon.getDate()) {
+							selectedBeacon = beacon;
+							continue;
+						}
+					}
 				}
 			}
+			
+
 		}
 		
 		return selectedBeacon;
