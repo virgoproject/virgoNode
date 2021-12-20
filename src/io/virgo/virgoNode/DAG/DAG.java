@@ -166,6 +166,8 @@ public class DAG implements Runnable {
 							if(selectedTip == null || selectedTip.getDate() < tip.getDate())
 								selectedTip = tip;
 						
+						i = 0;
+						
 						while(true) {
 							if(i >= lakingTransactions.size() || i >= 20)//limit to 20 so we periodically refresh lakingTransactions list
 								break;
@@ -183,7 +185,7 @@ public class DAG implements Runnable {
 				}
 			}
 			
-		}, 5000, 5000);
+		}, 5000, 10000);
 		
 		while(!Thread.interrupted()) {
 			
@@ -202,7 +204,9 @@ public class DAG implements Runnable {
 					else
 						checkTx(task.tx);
 				
-			} catch (InterruptedException e) {}
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
 			
 		}
 		
@@ -328,7 +332,7 @@ public class DAG implements Runnable {
 			return;
 		
 		//Check if we don't try to use an input claimed by a valid parent 
-		for(LoadedTransaction input : loadedInputs) {
+		/**for(LoadedTransaction input : loadedInputs) {
 			for(Transaction claimer : input.getOutputsMap().get(tx.getAddress()).claimers) {
 				LoadedTransaction loadedClaimer = claimer.getLoaded();
 				if(!loadedClaimer.getStatus().isRefused())
@@ -336,7 +340,7 @@ public class DAG implements Runnable {
 						if(parent.isChildOf(loadedClaimer))
 							return;
 			}
-		}
+		}**/
 		
 		//transmit tx to peers
 		JSONObject txInv = new JSONObject();	
@@ -392,11 +396,24 @@ public class DAG implements Runnable {
 	/**
 	 * Get best tips ids to use as parent for a new transaction
 	 */
-	public ArrayList<Sha256Hash> getBestParents() {
+	public ArrayList<Sha256Hash> getBestParents(LoadedTransaction parentBeacon) {
+		
 		ArrayList<Sha256Hash> bestParents = new ArrayList<Sha256Hash>();
 		while(bestParents.size() == 0) {//avoid desync probs, there can't be 0 childLess txs
-			for(LoadedTransaction tx : childLessTxs)
-				bestParents.add(tx.getHash());
+			for(LoadedTransaction tx : childLessTxs) {
+				if(tx.isChildOf(parentBeacon))
+					bestParents.add(tx.getHash());
+			}
+			
+			if(bestParents.size() == 0) {
+				bestParents.add(parentBeacon.getHash());
+			}
+			
+			for(LoadedTransaction tx : childLessTxs) {
+				if(bestParents.size() == 5) break;
+				if(!bestParents.contains(tx.getHash()))
+					bestParents.add(tx.getHash());
+			}
 		}
 		
 		return bestParents;

@@ -7,14 +7,19 @@ import java.math.BigInteger;
 import java.sql.SQLException;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map.Entry;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import io.virgo.geoWeb.GeoWeb;
 import io.virgo.geoWeb.utils.AddressUtils;
+import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.DAG.DAG;
 import io.virgo.virgoNode.Data.Database;
 import io.virgo.virgoNode.REST.Server;
@@ -48,6 +53,9 @@ public class Main {
 	public static int txsSec = 0;
 	static String[] runningIndicators = {"-", "\\", "|", "/"};
 	static int currentIndicator = 0;
+	//static int indicator2 = 0;
+	
+	public static ConcurrentHashMap<Sha256Hash, Integer> unreleasedLocks = new ConcurrentHashMap<Sha256Hash, Integer>();
 	
 	/**
 	 * Main function called on Application startup
@@ -123,6 +131,15 @@ public class Main {
 				currentIndicator++;
 				if(currentIndicator > 3)
 					currentIndicator = 0;
+				
+				/**indicator2++;
+				if(indicator2 > 5) {
+					indicator2 = 0;
+					System.out.println("unreleased Locks: ");
+					for(Entry<Sha256Hash, Integer> lock : unreleasedLocks.entrySet()) {
+						System.out.println(lock.getKey().toString() + " " + lock.getValue());
+					}
+				}**/
 			}
 			
 		}, 1000l, 1000l);

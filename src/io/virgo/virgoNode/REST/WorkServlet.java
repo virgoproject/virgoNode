@@ -24,7 +24,7 @@ public class WorkServlet {
 		response.put("key", bestParentBeacon.getRandomXKey());
 		
 		JSONArray parentTxs = new JSONArray();
-		for(Sha256Hash parent : Main.getDAG().getBestParents())
+		for(Sha256Hash parent : Main.getDAG().getBestParents(bestParentBeacon))
 			parentTxs.put(parent.toString());
 			
 		response.put("parentTxs", parentTxs);
