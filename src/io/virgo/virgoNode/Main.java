@@ -21,6 +21,7 @@ import io.virgo.geoWeb.GeoWeb;
 import io.virgo.geoWeb.utils.AddressUtils;
 import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.DAG.DAG;
+import io.virgo.virgoNode.DAG.LoadedTransaction;
 import io.virgo.virgoNode.Data.Database;
 import io.virgo.virgoNode.REST.Server;
 import io.virgo.virgoNode.Utils.Miscellaneous;
@@ -53,7 +54,12 @@ public class Main {
 	public static int txsSec = 0;
 	static String[] runningIndicators = {"-", "\\", "|", "/"};
 	static int currentIndicator = 0;
-	//static int indicator2 = 0;
+	static int indicator2 = 0;
+	public static long cumulatedTime = 0;
+	public static long actionCount = 0;
+	public static long actionCount2 = 0;
+	public static long actionCount3 = 0;
+	public static long cumulatedTime2 = 0;
 	
 	public static ConcurrentHashMap<Sha256Hash, Integer> unreleasedLocks = new ConcurrentHashMap<Sha256Hash, Integer>();
 	
@@ -132,14 +138,24 @@ public class Main {
 				if(currentIndicator > 3)
 					currentIndicator = 0;
 				
-				/**indicator2++;
+				indicator2++;
 				if(indicator2 > 5) {
 					indicator2 = 0;
-					System.out.println("unreleased Locks: ");
-					for(Entry<Sha256Hash, Integer> lock : unreleasedLocks.entrySet()) {
-						System.out.println(lock.getKey().toString() + " " + lock.getValue());
+					if(unreleasedLocks.size() > 1000000) {
+						System.out.println("unreleased Locks: ");
+						for(Entry<Sha256Hash, Integer> lock : unreleasedLocks.entrySet()) {
+							System.out.println(lock.getKey().toString() + " " + lock.getValue());
+						}
 					}
-				}**/
+					if(actionCount > 0 && actionCount2 > 0)
+					System.out.println("avg: " + (cumulatedTime/actionCount) + " | " + actionCount + " | " + (cumulatedTime2/actionCount2) + " | " + actionCount2 + " | " + Main.actionCount3);
+										
+					cumulatedTime = 0;
+					actionCount = 0;
+					actionCount2 = 0;
+					actionCount3 = 0;
+					cumulatedTime2 = 0;
+				}
 			}
 			
 		}, 1000l, 1000l);

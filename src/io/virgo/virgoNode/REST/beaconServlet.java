@@ -8,6 +8,7 @@ import org.json.JSONObject;
 import io.virgo.virgoCryptoLib.Sha256Hash;
 import io.virgo.virgoNode.Main;
 import io.virgo.virgoNode.DAG.LoadedTransaction;
+import io.virgo.virgoNode.DAG.Transaction;
 
 /**
  * REST API Beacon servlet
@@ -69,6 +70,12 @@ public class beaconServlet {
 				response.put("randomXKey", beacon.getRandomXKey());
 				response.put("weight", beacon.getWeight());
 				response.put("confirmations", beacon.confirmationCount());
+				
+				JSONArray childBeacons = new JSONArray();
+				for(Transaction child : beacon.loadedChildBeacons)
+					childBeacons.put(child.getHash().toString());
+				
+				response.put("childBeacons", childBeacons);
 				
 				return new Response(200, response.toString());
 			}

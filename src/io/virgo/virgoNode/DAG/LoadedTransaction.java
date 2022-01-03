@@ -50,6 +50,8 @@ public class LoadedTransaction {
 	private Sha256Hash practical_randomX_key = null;
 	
 	private Transaction settlingTransaction;
+	private ArrayList<Transaction> settledTransactions = new ArrayList<Transaction>();
+	private boolean hasSettled = false;
 	
 	/**
 	 * Basic transaction constructor
@@ -255,7 +257,7 @@ public class LoadedTransaction {
 			parentBeacon.releaseWriteLock();
 			return;
 		}
-
+		
 		if(!confirmedParents)
 			confirmParents();
 				
@@ -268,27 +270,29 @@ public class LoadedTransaction {
 			if(t.mainChainMember)
 				mainChainBeaconChild = t;
 			
-			if(t.getWeight().compareTo(pounds) > 0){
+			BigInteger weight = t.getWeight();
+			
+			if(weight.compareTo(pounds) > 0){
 				lst.clear();
-				pounds = t.getWeight();
+				pounds = weight;
 				lst.add(t);
 			}
-			else if(t.getWeight().compareTo(pounds) == 0)
+			else if(weight.compareTo(pounds) == 0)
 				lst.add(t);
 		}
 		
 	    if (lst.size() == 1 && !lst.get(0).equals(mainChainBeaconChild)) {
-	        
-	    	lst.get(0).mainChainMember = true;
 	    	
 	        for (Transaction e : loadedChildBeacons) {
 				LoadedTransaction t = e.getLoadedWrite(14);
 		        if (t.equals(lst.get(0)))
 		        	continue; 
+
 		        t.undoChain();
 		        t.rejectTx();
 		    } 
 	    	
+	        lst.get(0).mainChainMember = true;
 	        lst.get(0).chooseNextBeacon();
 	        
 	    }else if(lst.size() > 1 && mainChainBeaconChild != null)
@@ -306,11 +310,7 @@ public class LoadedTransaction {
 		confirmedParents = true;
 		confirmTx();
 		
-		for(Sha256Hash parent : getParentsHashes()) {
-			LoadedTransaction loadedParent = Main.getDAG().getTx(parent).getLoadedWrite(6);
-			loadedParent.setSettler(this);
-			loadedParent.releaseWriteLock();
-		}
+		setSettler();
 		
 		for(Transaction conflictingTransaction : conflictualTxs) {
 			boolean canConfirm = true;
@@ -340,16 +340,31 @@ public class LoadedTransaction {
 	 * Settling is confirming transactions that aren't conflicting with other
 	 * and adding conflictual transactions to a list for later solving in confirmParents()
 	 */
-	private void setSettler(LoadedTransaction tx) {
+	private void setSettler() {
+		if(hasSettled) {
+			for(Transaction oldSettle : settledTransactions) {
+				LoadedTransaction oldSettleLoaded = oldSettle.getLoadedWrite(20);
+				settleTx(oldSettleLoaded);
+				oldSettleLoaded.releaseWriteLock();
+			}
+			return;
+		}
+		
+		hasSettled = true;
 		
 		Stack<LoadedTransaction> s = new Stack<LoadedTransaction>();
 		ArrayList<Sha256Hash> done = new ArrayList<Sha256Hash>();
 		LoadedTransaction tmp;
 		
-		if(settlingTransaction == null)
-			settlingTransaction = tx.baseTransaction;
-		
-		s.add(this);
+		for(Sha256Hash parent : getParentsHashes()) {
+			LoadedTransaction loadedParent = Main.getDAG().getTx(parent).getLoadedWrite(6);
+			if(loadedParent.settlingTransaction == null) {
+				settledTransactions.add(loadedParent.baseTransaction);
+				loadedParent.settlingTransaction = baseTransaction;
+			}
+			
+			s.add(loadedParent);
+		}
 		
 		while(!s.isEmpty()){
 			tmp = s.pop();
@@ -363,64 +378,57 @@ public class LoadedTransaction {
 			for(Sha256Hash e : tmp.getParentsHashes()){
 				LoadedTransaction t = Main.getDAG().getTx(e).getLoadedWrite(9);
 				//if beacon transaction we add it to continue walking but don't change it's settlingTransaction
+				
 				if(t.isBeaconTransaction()) {
+					
 					if(!done.contains(t.getHash())) {
 						s.add(t);
 						done.add(t.getHash());
 					}else t.releaseWriteLock();
-					
 					continue;
 				}
 				
 				if(t.settlingTransaction == null){
-					t.settlingTransaction = tx.baseTransaction;
-					if(!done.contains(t.getHash())) {
-						s.add(t);
-						done.add(t.getHash());
-					}else t.releaseWriteLock();
+					settledTransactions.add(t.baseTransaction);
+					t.settlingTransaction = baseTransaction;
+					s.add(t);
 					continue;
 				}
 				
 				t.releaseWriteLock();
 			}
-			
+
 			//if beacon transaction don't process it
 			if(tmp.isBeaconTransaction()) {
 				tmp.releaseWriteLock();
 				continue;
 			}
 			
-
-			
-			boolean canConfirm = true;
-			
-			//if any input is already spent refuse this transaction
-			for(TxOutput input : tmp.loadedInputs) {
-				if(input.getOriginTx().getLoaded().getStatus().isRefused() || input.isSpent()){
-					tmp.rejectTx();
-					canConfirm = false;
-					break;
-				}
-			}
-			
-			if(canConfirm) {//run only if transaction hasn't been refused on last check
-				b: for(TxOutput input : tmp.loadedInputs)
-					for(Transaction claimer : input.claimers) {
-						LoadedTransaction loadedClaimer = claimer.getLoaded();
-						if(loadedClaimer != tmp && !loadedClaimer.getStatus().isRefused()) {
-							settlingTransaction.getLoadedWrite(10).conflictualTxs.add(tmp.baseTransaction);
-							settlingTransaction.releaseWriteLock();
-							canConfirm = false;
-							break b;
-						}
-					}
-				if(canConfirm)
-					tmp.confirmTx();
-			}
-			
+			settleTx(tmp);
 			tmp.releaseWriteLock();
+			
 		}
 		
+	}
+	
+	public void settleTx(LoadedTransaction tx) {
+		for(TxOutput input : tx.loadedInputs) {
+			if(input.isSpent() || input.getOriginTx().getLoaded().getStatus().isRefused()){
+				tx.rejectTx();
+				return;
+			}
+		}
+		
+		for(TxOutput input : tx.loadedInputs)
+			for(Transaction claimer : input.claimers) {
+				LoadedTransaction loadedClaimer = claimer.getLoaded();
+				if(loadedClaimer != tx && !loadedClaimer.getStatus().isRefused()) {
+					conflictualTxs.add(tx.baseTransaction);
+					return;
+				}
+			}
+
+		tx.confirmTx();
 	}
 	
 	/**
@@ -430,17 +438,13 @@ public class LoadedTransaction {
 	private void undoChain() {
 		if(!mainChainMember)
 			return;
-		
+				
 		changeStatus(TxStatus.PENDING);
 		mainChainMember = false;
 		confirmedParents = false;
 		conflictualTxs.clear();
 		
-		for(Sha256Hash parent : getParentsHashes()) {
-			LoadedTransaction loadedParent = Main.getDAG().getTx(parent).getLoadedWrite(11);
-			loadedParent.removeSettler(this);
-			loadedParent.releaseWriteLock();
-		}
+		removeSettled();
 		
 		LoadedTransaction mainChainBeaconChild = null;
 		
@@ -457,6 +461,7 @@ public class LoadedTransaction {
 			mainChainBeaconChild.undoChain();
 			mainChainBeaconChild.releaseWriteLock();
 		}
+		
 	}
 	
 	/**
@@ -465,37 +470,17 @@ public class LoadedTransaction {
 	 * 
 	 * UndoChain subfunction 
 	 */
-	private void removeSettler(LoadedTransaction settler) {
-		if(settlingTransaction != settler.baseTransaction)
-			return;
+	private void removeSettled() {
 		
-		Stack<LoadedTransaction> s = new Stack<LoadedTransaction>();
-		s.add(this);
-		
-		settlingTransaction = null;
-		
-		changeStatus(TxStatus.PENDING);
-		
-		while(!s.isEmpty())
-		{
-			LoadedTransaction tmp = s.pop();
+		for(Transaction settled : settledTransactions) {
+			LoadedTransaction loadedSettled = settled.getLoadedWrite(13);
 			
-			for(Sha256Hash parent : tmp.getParentsHashes())
-			{
-				LoadedTransaction loadedParent = Main.getDAG().getTx(parent).getLoadedWrite(13);
-				if(loadedParent.settlingTransaction != settler.baseTransaction) {
-					loadedParent.releaseWriteLock();
-					continue;
-				}
-				
-				loadedParent.settlingTransaction = null;
-				
-				loadedParent.changeStatus(TxStatus.PENDING);
-				s.add(loadedParent);
-			}
+			loadedSettled.settlingTransaction = null;
+			loadedSettled.changeStatus(TxStatus.PENDING);
 			
-			tmp.releaseWriteLock();
+			loadedSettled.releaseWriteLock();
 		}
+
 	}
 	
 	/**
@@ -524,7 +509,7 @@ public class LoadedTransaction {
 	    {
 	    		LoadedTransaction current = stack.pop(); 
 	            for(Sha256Hash parent : current.getParentsHashes()) {
-	            	LoadedTransaction loadedParent = Main.getDAG().getTx(parent).getLoaded();
+	            	LoadedTransaction loadedParent = Main.getDAG().getLoadedTxSafe(parent);
 	            	
 		            if(loadedParent.height < target.height)
 		                continue;
@@ -563,6 +548,9 @@ public class LoadedTransaction {
 	 * Reject this transaction/beacon and subsequent output claimers/child beacons
 	 */
 	public void rejectTx() {
+		if(getStatus().isRefused())
+			return;
+		
 		changeStatus(TxStatus.REFUSED);
 	
 		for(TxOutput out : getOutputsMap().values())
@@ -721,7 +709,7 @@ public class LoadedTransaction {
 				newWeight = newWeight.add(branchEntry.getKey().getBranchWeight().subtract(branchEntry.getValue()));
 			else
 				newWeight = newWeight.add(branchEntry.getKey().getFirst().getLoaded().getWeight());
-		
+				
 		return newWeight;
 	}
 	
