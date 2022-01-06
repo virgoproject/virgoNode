@@ -251,55 +251,72 @@ public class LoadedTransaction {
 	 */
 	private void chooseNextBeacon() {
 		
-		if(!mainChainMember) {
-			LoadedTransaction parentBeacon = Main.getDAG().getTx(getParentBeaconHash()).getLoadedWrite(4);
-			parentBeacon.chooseNextBeacon();
-			parentBeacon.releaseWriteLock();
-			return;
-		}
+		LoadedTransaction tx = this;
 		
-		if(!confirmedParents)
-			confirmParents();
-				
-		LoadedTransaction mainChainBeaconChild = null;
-		List<LoadedTransaction> lst = new ArrayList<LoadedTransaction>();
-		BigInteger pounds = BigInteger.ZERO;
-		
-		for(Transaction e : loadedChildBeacons){
-			LoadedTransaction t = e.getLoadedWrite(5);
-			if(t.mainChainMember)
-				mainChainBeaconChild = t;
+		while(tx != null) {
 			
-			BigInteger weight = t.getWeight();
+			LoadedTransaction beacon = tx;
+			tx = null;
 			
-			if(weight.compareTo(pounds) > 0){
-				lst.clear();
-				pounds = weight;
-				lst.add(t);
+			if(!beacon.mainChainMember) {
+				tx = Main.getDAG().getTx(beacon.getParentBeaconHash()).getLoadedWrite(4);
+				beacon.releaseWriteLock();
+				continue;
 			}
-			else if(weight.compareTo(pounds) == 0)
-				lst.add(t);
-		}
-		
-	    if (lst.size() == 1 && !lst.get(0).equals(mainChainBeaconChild)) {
-	    	
-	        for (Transaction e : loadedChildBeacons) {
-				LoadedTransaction t = e.getLoadedWrite(14);
-		        if (t.equals(lst.get(0)))
-		        	continue; 
+			
+			if(!beacon.confirmedParents)
+				beacon.confirmParents();
+					
+			LoadedTransaction mainChainBeaconChild = null;
+			List<LoadedTransaction> lst = new ArrayList<LoadedTransaction>();
+			BigInteger pounds = BigInteger.ZERO;
+			
+			for(Transaction e : beacon.loadedChildBeacons){
+				LoadedTransaction t = e.getLoadedWrite(5);
+				if(t.mainChainMember)
+					mainChainBeaconChild = t;
+				
+				BigInteger weight = t.getWeight();
+				
+				if(weight.compareTo(pounds) > 0){
+					lst.clear();
+					pounds = weight;
+					lst.add(t);
+				}
+				else if(weight.compareTo(pounds) == 0)
+					lst.add(t);
+			}
+			
+		    if (lst.size() == 1 && !lst.get(0).equals(mainChainBeaconChild)) {
+		    	
+		        for (Transaction e : beacon.loadedChildBeacons) {
+					LoadedTransaction t = e.getLoadedWrite(14);
+			        if (t.equals(lst.get(0)))
+			        	continue; 
 
-		        t.undoChain();
-		        t.rejectTx();
-		    } 
-	    	
-	        lst.get(0).mainChainMember = true;
-	        lst.get(0).chooseNextBeacon();
-	        
-	    }else if(lst.size() > 1 && mainChainBeaconChild != null)
-	    	mainChainBeaconChild.undoChain();
-	
-        for (Transaction e : loadedChildBeacons)
-        	e.releaseWriteLock();
+			        t.undoChain();
+			        t.rejectTx(3);
+			    }
+		        
+		        lst.get(0).mainChainMember = true;
+		        tx = lst.get(0);
+		        
+		        for (Transaction e : beacon.loadedChildBeacons)
+		        	if(lst.get(0).baseTransaction != e)
+		        		e.releaseWriteLock();
+		        
+		        beacon.releaseWriteLock();
+		        
+		        continue;
+		        
+		    }else if(lst.size() > 1 && mainChainBeaconChild != null)
+		    	mainChainBeaconChild.undoChain();
+		
+	        for (Transaction e : beacon.loadedChildBeacons)
+	        	e.releaseWriteLock();
+			
+	        beacon.releaseWriteLock();
+		}
         
 	}
 	
@@ -308,7 +325,7 @@ public class LoadedTransaction {
 	 */
 	private void confirmParents() {
 		confirmedParents = true;
-		confirmTx();
+		confirmTx(1);
 		
 		setSettler();
 		
@@ -324,9 +341,9 @@ public class LoadedTransaction {
 			}
 			
 			if(canConfirm)
-				conflictingTransaction.getLoadedWrite(7).confirmTx();
+				conflictingTransaction.getLoadedWrite(7).confirmTx(2);
 			else
-				conflictingTransaction.getLoadedWrite(8).rejectTx();
+				conflictingTransaction.getLoadedWrite(8).rejectTx(4);
 			
 			conflictingTransaction.releaseWriteLock();
 		}
@@ -344,6 +361,7 @@ public class LoadedTransaction {
 		if(hasSettled) {
 			for(Transaction oldSettle : settledTransactions) {
 				LoadedTransaction oldSettleLoaded = oldSettle.getLoadedWrite(20);
+				oldSettleLoaded.settlingTransaction = baseTransaction;
 				settleTx(oldSettleLoaded);
 				oldSettleLoaded.releaseWriteLock();
 			}
@@ -412,9 +430,10 @@ public class LoadedTransaction {
 	}
 	
 	public void settleTx(LoadedTransaction tx) {
+		
 		for(TxOutput input : tx.loadedInputs) {
 			if(input.isSpent() || input.getOriginTx().getLoaded().getStatus().isRefused()){
-				tx.rejectTx();
+				tx.rejectTx(5);
 				return;
 			}
 		}
@@ -428,7 +447,7 @@ public class LoadedTransaction {
 				}
 			}
 
-		tx.confirmTx();
+		tx.confirmTx(3);
 	}
 	
 	/**
@@ -540,14 +559,14 @@ public class LoadedTransaction {
 	/**
 	 * Confirm this transaction
 	 */
-	public void confirmTx() {
+	public void confirmTx(int i) {
 		changeStatus(TxStatus.CONFIRMED);
 	}
 	
 	/**
 	 * Reject this transaction/beacon and subsequent output claimers/child beacons
 	 */
-	public void rejectTx() {
+	public void rejectTx(int i) {
 		if(getStatus().isRefused())
 			return;
 		
@@ -556,14 +575,14 @@ public class LoadedTransaction {
 		for(TxOutput out : getOutputsMap().values())
 			for(Transaction claimer : out.claimers) {
 				LoadedTransaction loadedClaimer = claimer.getLoadedWrite(15);
-				loadedClaimer.rejectTx();
+				loadedClaimer.rejectTx(1);
 				loadedClaimer.releaseWriteLock();
 			}
 		
 		if(isBeaconTransaction())
 			for(Transaction childBeacon : loadedChildBeacons) {
 				LoadedTransaction loadedChild = childBeacon.getLoadedWrite(16);
-				loadedChild.rejectTx();
+				loadedChild.rejectTx(2);
 				loadedChild.releaseWriteLock();
 			}
 	}
@@ -702,15 +721,27 @@ public class LoadedTransaction {
 	 * Calculate beacon weight by adding child branches weights 
 	 */
 	public BigInteger getWeight() {
+		
 		BigInteger newWeight = BigInteger.ZERO;
+		
+		Stack<Transaction> s = new Stack<Transaction>();
 
-		for(Entry<BeaconBranch, BigInteger> branchEntry : beaconBranchs.entrySet())
-			if(branchEntry.getKey().equals(getMainBeaconBranch()))
-				newWeight = newWeight.add(branchEntry.getKey().getBranchWeight().subtract(branchEntry.getValue()));
-			else
-				newWeight = newWeight.add(branchEntry.getKey().getFirst().getLoaded().getWeight());
+		s.add(baseTransaction);
+		
+		while(!s.isEmpty()) {
+			
+			LoadedTransaction t = s.pop().getLoaded();
+			
+			for(Entry<BeaconBranch, BigInteger> branchEntry : t.beaconBranchs.entrySet())
+				if(branchEntry.getKey().equals(t.getMainBeaconBranch()))
+					newWeight = newWeight.add(branchEntry.getKey().getBranchWeight().subtract(branchEntry.getValue()));
+				else
+					s.add(branchEntry.getKey().getFirst());
+			
+		}
 				
 		return newWeight;
+		
 	}
 	
 	public long getBeaconHeight() {
@@ -734,11 +765,22 @@ public class LoadedTransaction {
 			return settlingTransaction.getLoaded().confirmationCount();
 		
 		int confirmations = 0;
-		for(Entry<BeaconBranch, BigInteger> branchEntry : beaconBranchs.entrySet())
-			if(branchEntry.getKey().equals(getMainBeaconBranch()))
-				confirmations += branchEntry.getKey().getBranchConfirmations() - branchEntry.getKey().indexOf(baseTransaction);
-			else
-				confirmations += branchEntry.getKey().getFirst().getLoaded().confirmationCount();
+		
+		Stack<Transaction> s = new Stack<Transaction>();
+
+		s.add(baseTransaction);
+		
+		while(!s.isEmpty()) {
+			
+			LoadedTransaction t = s.pop().getLoaded();
+			
+			for(Entry<BeaconBranch, BigInteger> branchEntry : t.beaconBranchs.entrySet())
+				if(branchEntry.getKey().equals(t.getMainBeaconBranch()))
+					confirmations += branchEntry.getKey().getBranchConfirmations() - branchEntry.getKey().indexOf(t.baseTransaction);
+				else
+					s.add(branchEntry.getKey().getFirst());
+			
+		}
 		
 		return confirmations;
 	}

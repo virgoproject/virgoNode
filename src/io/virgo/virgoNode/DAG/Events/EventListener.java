@@ -76,7 +76,7 @@ public class EventListener implements Runnable {
 						onTransactionStatusChanged((TransactionStatusChangedEvent) event);
 						break;
 				}
-			} catch (InterruptedException e) {
+			} catch (Exception e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}

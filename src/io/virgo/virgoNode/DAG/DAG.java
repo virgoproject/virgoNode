@@ -146,6 +146,8 @@ public class DAG implements Runnable {
 			public void run() {
 				try {
 					
+					Peers.getTips();
+					
 					int i = 0;
 					
 					while(true) {
@@ -300,20 +302,13 @@ public class DAG implements Runnable {
 	 * if so send it to verification pool for differents checks
 	 */
 	private void checkTx(Transaction tx) {
-		long t1 = System.nanoTime();
+		
 		if(transactions.containsKey(tx.getHash()))
 			return;
-		Main.actionCount++;
-		Main.cumulatedTime += System.nanoTime()-t1;
-		
-		t1 = System.nanoTime();
 		
 		if(waitingTxsHashes.contains(tx.getHash()))
 			return;
-		
-		Main.actionCount2++;
-		Main.cumulatedTime2 += System.nanoTime()-t1;
-		
+
 		ArrayList<Sha256Hash> waitedTxs = new ArrayList<Sha256Hash>();
 		
 		//Check for missing parents 
@@ -411,18 +406,19 @@ public class DAG implements Runnable {
 	public ArrayList<Sha256Hash> getBestParents(LoadedTransaction parentBeacon) {
 		
 		ArrayList<Sha256Hash> bestParents = new ArrayList<Sha256Hash>();
-		while(bestParents.size() == 0) {//avoid desync probs, there can't be 0 childLess txs
+		b: while(bestParents.size() == 0) {//avoid desync probs, there can't be 0 childLess txs
 			for(LoadedTransaction tx : childLessTxs) {
-				if(tx.isChildOf(parentBeacon))
+				if(bestParents.size() == 5) break b;
+				if(!bestParents.contains(tx.getHash()) && tx.isChildOf(parentBeacon))
 					bestParents.add(tx.getHash());
 			}
 			
-			if(bestParents.size() == 0) {
+			if(bestParents.size() == 0 && !bestParents.contains(parentBeacon.getHash())) {
 				bestParents.add(parentBeacon.getHash());
 			}
 			
 			for(LoadedTransaction tx : childLessTxs) {
-				if(bestParents.size() == 5) break;
+				if(bestParents.size() == 5) break b;
 				if(!bestParents.contains(tx.getHash()))
 					bestParents.add(tx.getHash());
 			}
@@ -451,20 +447,14 @@ public class DAG implements Runnable {
 			}
 			
 			if(selectedBeacon.getFloorWeight().compareTo(beacon.getFloorWeight()) == 0) {
-				if(selectedBeacon.getWeight().compareTo(beacon.getWeight()) < 0) {
+				if(selectedBeacon.getBeaconHeight() < beacon.getBeaconHeight()) {
 					selectedBeacon = beacon;
 					continue;
 				}
-				if(selectedBeacon.getWeight() == beacon.getWeight()) {
-					if(selectedBeacon.getBeaconHeight() < beacon.getBeaconHeight()) {
+				if(selectedBeacon.getBeaconHeight() == beacon.getBeaconHeight()) {
+					if(selectedBeacon.getDate() > beacon.getDate()) {
 						selectedBeacon = beacon;
 						continue;
-					}
-					if(selectedBeacon.getBeaconHeight() == beacon.getBeaconHeight()) {
-						if(selectedBeacon.getDate() > beacon.getDate()) {
-							selectedBeacon = beacon;
-							continue;
-						}
 					}
 				}
 			}
