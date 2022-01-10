@@ -598,7 +598,7 @@ public class LoadedTransaction {
 		
 		int T = 10;
 		
-		BigInteger sumD = BigInteger.valueOf(0);
+		BigInteger sumD = BigInteger.valueOf(285);
 		double sumST = 0;
 		
 		for (int solveTime : solveTimes) { 
@@ -609,7 +609,7 @@ public class LoadedTransaction {
 		}
 		
 		sumST = 285 + 0.2523*sumST;
-		return sumD.multiply(BigInteger.valueOf(T)).divide(BigInteger.valueOf((long) sumST));
+		return sumD.multiply(BigInteger.valueOf(T)).divide(BigInteger.valueOf((long) sumST)).add(BigInteger.ONE);
 		
 	}
 	
@@ -870,6 +870,14 @@ public class LoadedTransaction {
 		if(state.has("settlingTransaction"))
 			settlingTransaction = Main.getDAG().getTx(new Sha256Hash(state.getString("settlingTransaction")));
 		
+		hasSettled = state.getBoolean("hasSettled");
+		
+		if(hasSettled) {
+			JSONArray settledJSON = state.getJSONArray("settledTransactions");
+			for(int i = 0; i < settledJSON.length(); i++)
+				settledTransactions.add(Main.getDAG().getTx(new Sha256Hash(settledJSON.getString(i))));
+		}
+		
 	}
 	
 	public JSONObject JSONState() {
@@ -914,7 +922,7 @@ public class LoadedTransaction {
 			baseJSON.put("diffs", diffs);
 			
 			JSONArray times = new JSONArray();
-			for(long solveTime : solveTimes)
+			for(double solveTime : solveTimes)
 				times.put(solveTime);
 			baseJSON.put("solveTimes", times);
 			
@@ -930,6 +938,16 @@ public class LoadedTransaction {
 		
 		if(settlingTransaction != null)
 			baseJSON.put("settlingTransaction", settlingTransaction.getHash().toString());
+		
+		baseJSON.put("hasSettled", hasSettled);
+		
+		if(hasSettled) {
+			JSONArray settledJSON = new JSONArray();
+			for(Transaction tx : settledTransactions)
+				settledJSON.put(tx.getHash().toString());
+			
+			baseJSON.put("settledTransactions", settledJSON);
+		}
 		
 		return baseJSON;
 	}
