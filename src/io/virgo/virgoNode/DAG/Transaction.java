@@ -271,7 +271,7 @@ public class Transaction {
 		return tx;
 	}
 	
-	public LoadedTransaction getLoadedWrite(int i) {
+	public LoadedTransaction getLoadedWrite() {
 		lock.writeLock().lock();
 		try {
 			if(loadedTx == null)
@@ -284,8 +284,6 @@ public class Transaction {
 			lock.writeLock().unlock();
 		}
 		
-		Main.unreleasedLocks.put(getHash(), i);
-		
 		return loadedTx;
 	}
 	
@@ -293,7 +291,6 @@ public class Transaction {
 		int c = lock.getWriteHoldCount();
 		for(int i = 0; i < c; i++)
 			lock.writeLock().unlock();
-		Main.unreleasedLocks.remove(getHash());
 	}
 	
 }

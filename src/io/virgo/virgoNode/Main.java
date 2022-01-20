@@ -32,7 +32,7 @@ import io.virgo.geoWeb.exceptions.PortUnavailableException;
 //TODO: Refactor log system
 public class Main {
 	
-	public static final String VERSION = "0.0.5";
+	public static final String VERSION = "0.0.7";
 	
 	public static long netId = 2946073207412533257l;//Default netId, testnet one
 	public static int peerCountTarget = 8;
@@ -54,8 +54,6 @@ public class Main {
 	public static int txsSec = 0;
 	static String[] runningIndicators = {"-", "\\", "|", "/"};
 	static int currentIndicator = 0;
-	
-	public static ConcurrentHashMap<Sha256Hash, Integer> unreleasedLocks = new ConcurrentHashMap<Sha256Hash, Integer>();
 	
 	/**
 	 * Main function called on Application startup
@@ -127,8 +125,10 @@ public class Main {
 				
 				System.out.print("\r " + txsSec + " txs/s | " + (dag.pruner.loadedTransactions.size()+1) + "/" + dag.loadedTxsCount() + " in total | " + dag.getPoolSize() + " txs waiting | " + net.getPeers().size() + " peers | " +
 					formatter.format(usedMB) + "/" + formatter.format(maxMB) + "MB " + runningIndicators[currentIndicator]);
+				
 				txsSec = 0;
 				currentIndicator++;
+				
 				if(currentIndicator > 3)
 					currentIndicator = 0;
 				
